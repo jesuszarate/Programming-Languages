@@ -8,8 +8,12 @@
          (r : ExprC)]
   [multC (l : ExprC)
          (r : ExprC)]
+  [maxC (l : ExprC)
+        (r : ExprC)]
   [appC (s : symbol)
-        (arg : ExprC)]
+        (args : (listof ExprC))]
+  ;[appC (s : symbol)
+  ;      (arg : ExprC)]
   [ifZeroC (exp : ExprC)
            (ifTrue : ExprC)
            (ifFalse : ExprC)]
@@ -23,7 +27,7 @@
 
 (define-type FunDefC
   [fdC (name : symbol) 
-       (arg : symbol) 
+       (arg : (listof symbol))
        (body : ExprC)])
 
 (define-type Binding
@@ -49,9 +53,10 @@
     [(s-exp-match? '{* ANY ANY} s)
      (multC (parse (second (s-exp->list s)))
             (parse (third (s-exp->list s))))]
-    [(s-exp-match? '{SYMBOL ANY} s)
-     (appC (s-exp->symbol (first (s-exp->list s)))
-           (parse (second (s-exp->list s))))]
+    [(s-exp-match? '{max ANY ANY} s)
+     (maxC (parse (second (s-exp->list s)))
+           (parse (third (s-exp->list s))))]
+    
     [(s-exp-match? '{ifZero ANY ANY ANY} s)
      (ifZeroC (parse (second (s-exp->list s)))
               (parse (third (s-exp->list s)))
@@ -69,13 +74,19 @@
        (letC (s-exp->symbol (first bs))
              (parse (second bs))
              (parse (third (s-exp->list s)))))]
+     [(s-exp-match? '{SYMBOL ANY ...} s)
+      
+     (appC (s-exp->symbol (first (s-exp->list s)))
+           (map parse (rest (s-exp->list s))))]
+    
     [else (error 'parse "invalid input")]))
 
 (define (parse-fundef [s : s-expression]) : FunDefC
   (cond
-    [(s-exp-match? '{define {SYMBOL SYMBOL} ANY} s)
+    [(s-exp-match?'{define {SYMBOL SYMBOL ...} ANY} s)
+     ;(s-exp-match? '{define {SYMBOL SYMBOL} ANY} s)
      (fdC (s-exp->symbol (first (s-exp->list (second (s-exp->list s)))))
-          (s-exp->symbol (second (s-exp->list (second (s-exp->list s)))))
+          (map (lambda (arg) (s-exp->symbol arg)) (rest (s-exp->list (second (s-exp->list s)))))
           (parse (third (s-exp->list s))))]
     [else (error 'parse-fundef "invalid input")]))
 
@@ -92,7 +103,13 @@
         (plusC (multC (numC 3) (numC 4))
                (numC 8)))
   (test (parse '{double 9})
-        (appC 'double (numC 9)))
+        (appC 'double (list (numC 9))))
+  
+  (test (parse '{double 9 8})
+        (appC 'double (list (numC 9) (numC 8))))
+  (test (parse '{double 9 8 10})
+        (appC 'double (list (numC 9) (numC 8) (numC 10))))
+  
   (test (parse '{let {[x {+ 1 2}]}
                   y})
         (letC 'x (plusC (numC 1) (numC 2))
@@ -111,7 +128,10 @@
             "invalid input")
 
   (test (parse-fundef '{define {double x} {+ x x}})
-        (fdC 'double 'x (plusC (idC 'x) (idC 'x))))
+        (fdC 'double (list 'x) (plusC (idC 'x) (idC 'x))))
+  ;(test (parse-fundef '{define {double x y z} {+ x y z}})
+  ;      (fdC 'double (list 'x 'y 'z) (plusC (idC 'x) (idC 'y))))
+  
   (test/exn (parse-fundef '{def {f x} x})
             "invalid input")
 
@@ -120,11 +140,13 @@
   (define quadruple-def
     (parse-fundef '{define {quadruple x} {double {double x}}})))
 
-(define (get-binding-symbol [b : Binding]) : symbol
-  (type-case Binding b
-    [bind (s n) s]
-    )
-  )
+;(define (get-binding-symbol [b : Binding]) : symbol
+ ; (type-case Binding b
+  ;  [bind (s n) s]
+   ; )
+  ;)
+;(test (get-binding-symbol []))
+
 ;; get-fundef ----------------------------------------
 (define (get-fundef [s : symbol] [fds : (listof FunDefC)]) : FunDefC
   (cond
@@ -181,12 +203,13 @@
                   (rest rest-env))]
     )
   )
-
+(module+ test
 (test (unbind 't mt-env (list(bind 'z 3) (bind 'y 2) (bind 'x 1)))  (list(bind 'z 3) (bind 'y 2) (bind 'x 1)))
 (test (unbind 'y mt-env (list(bind 'z 3) (bind 'y 2) (bind 'x 1)))  (list(bind 'z 3) (bind 'x 1)))
 (test (unbind 'x mt-env (list(bind 'z 3) (bind 'y 2) (bind 'x 1)))  (list(bind 'z 3) (bind 'y 2)))
 (test (unbind 'z mt-env (list(bind 'z 3) (bind 'y 2) (bind 'x 1)))  (list(bind 'y 2) (bind 'x 1)))
 (test (unbind 'y mt-env mt-env) mt-env)
+  )
 
 ;; interp ----------------------------------------
 (define (interp [a : ExprC] [env : Env] [fds : (listof FunDefC)]) : number
@@ -195,6 +218,8 @@
     [idC (s) (lookup s env)]
     [plusC (l r) (+ (interp l env fds) (interp r env fds))]
     [multC (l r) (* (interp l env fds) (interp r env fds))]
+    [maxC (l r) (if(> (interp l env fds) (interp r env fds)) (interp l env fds) (interp r env fds))]
+#|
     [appC (s arg) (local [(define fd (get-fundef s fds))]
                     (interp (fdC-body fd)
                             (extend-env
@@ -202,6 +227,23 @@
                                    (interp arg env fds))
                              mt-env)
                             fds))]
+    |#
+      
+    #| Currently working one/ compiling one
+    [appC (s args) (local [(define fd (get-fundef s fds))]
+                     (foldl + 0 (map2 (lambda (a d)
+                                        (interp (fdC-body fd) (extend-env (bind d (interp a env fds)) mt-env)fds)) ; The lambda work goes in here
+                                      args (fdC-arg fd))))]
+    |#
+    [appC (s args) (local [(define fd (get-fundef s fds))]                     
+                     (interp (fdC-body fd)
+                             (if(= (length args) (length (fdC-arg fd)))
+                                (foldl (lambda (element env-e)(append element env-e)) env
+                                       (map2 (lambda (a d)                                            
+                                               (extend-env (bind d (interp a env fds)) mt-env)) args (fdC-arg fd)))
+                                (error 'interp "wrong arity"))
+                             fds))]                                       
+    
     [ifZeroC (tst thn els) (if (= (interp tst env fds) 0)
                                (interp thn env fds)
                                (interp els env fds))]
@@ -282,7 +324,18 @@
                     (list (parse-fundef '{define {bad x} {+ x y}})))
             "free variable"))
 
+;;max-------------------------------------------------------------
+(test (interp (parse '{max 1 2})
+                mt-env
+                (list))
+        2)
+  (test (interp (parse '{max {+ 4 5} {+ 2 3}})
+                mt-env
+                (list))
+        9)
+
 ;;unlet-------------------------------------------------------------
+(module+ test
 (test/exn (interp (parse '{let {[x 1]}
                              {unlet x
                               x}})
@@ -314,9 +367,41 @@
                                          {unlet z
                                            z}}})))
         2)
+)
+
+; Part 3 — Functions that Accept Multiple Arguments -----------------------------------------------------------
+;(module+ test
+(test (interp (parse '{f 1 2})
+              mt-env
+              (list (parse-fundef '{define {f x y} {+ x y}})))
+      3)
+
+(test (interp (parse '{f})
+              mt-env
+              (list (parse-fundef '{define {f} {+ 1 2}})))
+      3)
+(test (interp (parse '{f 1})
+              mt-env
+              (list (parse-fundef '{define {f x} {+ x x}})))
+      2)
+(test (interp (parse '{+ {f} {f}})
+              mt-env
+              (list (parse-fundef '{define {f} 5})))
+      10)
+(test/exn (interp (parse '{f 1})
+                  mt-env
+                  (list (parse-fundef '{define {f x y} {+ x y}})))
+          "wrong arity")
+
+(test (interp (parse '{f 1 2 3})
+              mt-env
+              (list (parse-fundef '{define {f x y z} {+ {+ x y} z}})))
+      6)
+;)
 
 
-
-
+;Handin will be accepted, but...
+;while evaluating (interp (parse (quote (max 2 1))) mt-env (list)):
+; get-fundef: undefined function
 
 
