@@ -206,7 +206,7 @@
 (define (repeating-args? [current : symbol][args : (listof symbol)])
   (cond [(empty? args) #f]
         [(eq? current (first args)) #t]
-        [else (repeating-args? (first args) (rest args))]))
+         [else (repeating-args? (first args) (rest args))]))
 
 (define (contain-duplicates? [lst : (listof symbol)])
   (cond
@@ -225,22 +225,16 @@
     [multC (l r) (* (interp l env fds) (interp r env fds))]
     [maxC (l r) (if(> (interp l env fds) (interp r env fds)) (interp l env fds) (interp r env fds))]
     
-;    [appC (s args) (local [(define fd (get-fundef s fds))]                     
-;                     (interp (fdC-body fd)
-;                             (if(contain-duplicates? (fdC-arg fd)) (error 'interp "bad syntax")
-;                                (if (= (length args) (length (fdC-arg fd)))
-;                                    (foldl (lambda (element env-e)(append element env-e)) mt-env
-;                                           (map2 (lambda (a d)                                            
-;                                                   (extend-env (bind d (interp a env fds)) mt-env))
-;                                                 args (fdC-arg fd)))                                    
-;                                    (error 'interp "wrong arity")))a
-;                             fds))]
+    [appC (s args) (local [(define fd (get-fundef s fds))]                     
+                     (interp (fdC-body fd)
+                             (if(contain-duplicates? (fdC-arg fd)) (error 'interp "bad syntax")
+                                (if (= (length args) (length (fdC-arg fd)))
+                                    (foldl (lambda (element env-e)(append element env-e)) env
+                                           (map2 (lambda (a d)                                            
+                                                   (extend-env (bind d (interp a env fds)) mt-env)) args (fdC-arg fd)))
+                                    (error 'interp "wrong arity")))
+                             fds))]                                           
     
-    [appC (s args) (local [(define fd (get-fundef s fds))]
-                                                     (interp (fdC-body fd)
-                                                             (foldl extend-env 
-                                                                    (map2 bind (fdC-arg fd) (map (lambda (a) (interp a env fds)) args)) mt-env)
-                                                             fds))]
     [ifZeroC (tst thn els) (if (= (interp tst env fds) 0)
                                (interp thn env fds)
                                (interp els env fds))]
@@ -374,9 +368,9 @@
       3)
 
 (test/exn (interp (parse '{f 1 2})
-                  mt-env
-                  (list (parse-fundef '{define {f x x} {+ x y}})))
-          "bad syntax")
+              mt-env
+              (list (parse-fundef '{define {f x x} {+ x y}})))
+      "bad syntax")
 
 (test (interp (parse '{f})
               mt-env
