@@ -44,9 +44,10 @@
 ;; parse ----------------------------------------
 (define (parse [s : s-expression]) : ExprC
   (cond
-    [(s-exp-match? `NUMBER s) (numC (s-exp->number s))]
+    [(s-exp-match? `NUMBER s) (numC (s-exp->number s))]    
+    [(s-exp-match? `true s) (boolC true)]
+    [(s-exp-match? `false s) (boolC false)]
     [(s-exp-match? `SYMBOL s) (idC (s-exp->symbol s))]
-    [(s-exp-match? `BOOLEAN s) (boolC (s-exp->boolean s))]
     [(s-exp-match? '{+ ANY ANY} s)
      (plusC (parse (second (s-exp->list s)))
             (parse (third (s-exp->list s))))]
@@ -107,7 +108,7 @@
   (test (parse '{if {= 8 8} 0 1})
         (ifC  (equalC (numC 8) (numC 8)) (numC 0) (numC 1)))
   (test (parse '{if true 8 9})
-       (ifC (idC 'true) (numC 8) (numC 9)))
+       (ifC (boolC true) (numC 8) (numC 9)))
   )
 
 ;; interp ----------------------------------------
