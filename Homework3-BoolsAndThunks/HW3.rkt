@@ -277,6 +277,12 @@
     (error 'interp "not a number")])
   )
 
+(module+ test
+  (test (num-eq (numV 8) (numV 8)) (boolV true))
+  (test (num-eq (numV 8) (numV 9)) (boolV false))
+  (test/exn (num-eq (boolV true) (numV 9)) "not a number")
+  )
+
 ;; num+ and num* ----------------------------------------
 (define (num-op [op : (number number -> number)] [l : Value] [r : Value]) : Value
   (cond
@@ -295,7 +301,10 @@
   (test (num+ (numV 1) (numV 2))
         (numV 3))
   (test (num* (numV 2) (numV 3))
-        (numV 6)))
+        (numV 6))
+  (test (num= (numV 2) (numV 2))
+        (boolV true))
+  )
 
 ;; lookup ----------------------------------------
 (define (lookup [n : symbol] [env : Env]) : Value
