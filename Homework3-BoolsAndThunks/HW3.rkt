@@ -4,6 +4,7 @@
 (define-type Value
   [numV (n : number)]
   [boolV (b : boolean)]
+  [thunkV (t : ExprC)]
   [closV (arg : symbol)
          (body : ExprC)
          (env : Env)])
@@ -23,6 +24,8 @@
         (body : ExprC)]
   [equalC (lhs : ExprC)
           (rhs : ExprC)]
+  [delayC (v : ExprC)]
+  [forceC (v : ExprC)]
   [ifC (tst : ExprC)
        (t : ExprC)
        (f : ExprC)]
@@ -68,6 +71,10 @@
     [(s-exp-match? '{= ANY ANY} s)
      (equalC (parse (second (s-exp->list s)))
               (parse (third (s-exp->list s))))]
+    [(s-exp-match? '{delay ANY} s)
+                   (delayC (parse (second (s-exp->list s))))]
+    [(s-exp-match? '{force ANY} s)
+                   (forceC (parse (second (s-exp->list s))))]   
     [(s-exp-match? '{if ANY ANY ANY} s)
      (ifC (parse (second (s-exp->list s)))
           (parse (third (s-exp->list s)))
@@ -109,6 +116,16 @@
         (ifC  (equalC (numC 8) (numC 8)) (numC 0) (numC 1)))
   (test (parse '{if true 8 9})
        (ifC (boolC true) (numC 8) (numC 9)))
+  (test (parse '{delay {+ 1 1}})
+        (delayC (plusC (numC 1) (numC 1))))
+  (test (parse '{force {+ 1 1}})
+        (forceC (plusC (numC 1) (numC 1))))
+
+  (test (parse '{delay {+ 1 {lambda {x} x}}})
+        (delayC (plusC (numC 1) (lamC 'x (idC 'x)))))
+  
+  (test (parse '{force {delay {+ 1 {lambda {x} x}}}})
+        (forceC (delayC (plusC (numC 1) (lamC 'x (idC 'x))))))
   )
 
 ;; interp ----------------------------------------
@@ -136,7 +153,12 @@
                         [else (interp r env)])]
            [else (error 'interp "not a boolean")])
          ]
-           
+    [delayC (v) (thunkV v)] 
+    [forceC (v)
+            (type-case Value (interp v env)
+              [thunkV (t) (interp t env)]
+              [else (error 'interp "not a thunk")])]
+    
     [appC (fun arg) (type-case Value (interp fun env)
                       [closV (n body c-env)
                              (interp body
@@ -145,7 +167,6 @@
                                             (interp arg env))
                                       c-env))]
                       [else (error 'interp "not a function")])]))
-
 (module+ test
   (test (interp (parse '2) mt-env)
         (numV 2))
@@ -197,7 +218,6 @@
                 (boolV true))
   (test (interp (parse '{= {+ 4 3} 8}) mt-env)
                 (boolV false))
-  ;(test (interp (parse '{if })))
   
   (test (interp (parse '{if {= 2 {+ 1 1}} 7 8})
                 mt-env)
@@ -217,6 +237,28 @@
   (test/exn (interp (parse '{if 1 2 3})
                     mt-env)
             "not a boolean")
+
+  ;;1
+  (test (interp (parse '{delay {+ 1 {lambda {x} x}}}) mt-env)
+        (thunkV (plusC (numC 1) (lamC 'x (idC 'x)))))
+  ;;2
+  (test/exn (interp (parse '{force 1})
+                    mt-env)
+            "not a thunk")
+  ;;3
+  (test (interp (parse '{force {if {= 8 8} {delay 7} {delay 9}}})
+                mt-env)
+        (interp (parse '7)
+                mt-env))
+  ;;4
+  (test (interp (parse '{let {[d {let {[y 8]}
+                                   {delay {+ y 7}}}]}
+                          {let {[y 9]}
+                            {force d}}})
+                mt-env)
+        (interp (parse '15)
+                mt-env))
+  
   #;
   (time (interp (parse '{let {[x2 {lambda {n} {+ n n}}]}
                           {let {[x4 {lambda {n} {x2 {x2 n}}}]}
