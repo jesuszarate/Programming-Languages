@@ -4,7 +4,7 @@
 (define-type Value
   [numV (n : number)]
   [boolV (b : boolean)]
-  [thunkV (t : ExprC)]
+  [thunkV (t : ExprC)] ;(add an env)
   [closV (arg : symbol)
          (body : ExprC)
          (env : Env)])
@@ -157,6 +157,10 @@
     [forceC (v)
             (type-case Value (interp v env)
               [thunkV (t) (interp t env)]
+              [else (error 'interp "not a thunk")])]
+    [forceC (body)
+            (type-case Value body
+              [thunkV (v) (interp v env)]
               [else (error 'interp "not a thunk")])]
     
     [appC (fun arg) (type-case Value (interp fun env)
