@@ -174,20 +174,59 @@
                 [boxV (l) (v*s (fetch l sto-v) 
                                sto-v)]
                 [else (error 'interp "not a box")]))]
+
     [setboxC (bx val)
              (with [(v-b sto-b) (interp bx env sto)]
                (with [(v-v sto-v) (interp val env sto-b)]
                  (type-case Value v-b
                    [boxV (l)
-                         (v*s v-v
+                         (if (value-exists l sto-v)
+                             (v*s v-v
+                                  (override-store (cell l v-v)
+                                                  (remove-cell l sto-v)))
+                             (v*s v-v
                               (override-store (cell l v-v)
-                                              sto-v))]
+                                              sto-v))
+                         )]
+
                    [else (error 'interp "not a box")])))]
+    
     [beginC (l r)
             (with [(v-l sto-l) (interp l env sto)]
               (interp r env sto-l))]))
 
 (module+ test
+(test (interp (parse '{let {[b {box 1}]}
+                          {begin
+                           {set-box! b 2}
+                           {unbox b}}})
+                mt-env
+                mt-store)
+        (v*s (numV 2)
+             (override-store (cell 1 (numV 2))
+                             mt-store)))
+
+
+  (test (interp (parse '{set-box! {box 5} 6})
+                mt-env
+                mt-store)
+        (v*s (numV 6)
+             (override-store (cell 1 (numV 6))                             
+                                             mt-store)))
+  
+  (test (interp (parse '{let {[b (box 5)]}
+                          {begin
+                            {set-box! b 6}
+                            {unbox b}}})
+                mt-env
+                mt-store)
+        
+        
+        (v*s (numV 6)
+             (override-store (cell 1 (numV 6))                             
+                                             mt-store)))
+  
+ 
   (test (interp (parse '2) mt-env mt-store)
         (v*s (numV 2) 
              mt-store))
@@ -251,29 +290,13 @@
         (v*s (numV 5)
              (override-store (cell 1 (numV 5))
                              mt-store)))
-  (test (interp (parse '{set-box! {box 5} 6})
-                mt-env
-                mt-store)
-        (v*s (numV 6)
-             (override-store (cell 1 (numV 6))
-                             (override-store (cell 1 (numV 5))
-                                             mt-store))))
-  (test (interp (parse '{begin 1 2})
+  
+
+(test (interp (parse '{begin 1 2})
                 mt-env
                 mt-store)
         (v*s (numV 2)
              mt-store))
-  (test (interp (parse '{let {[b (box 5)]}
-                          {begin
-                            {set-box! b 6}
-                            {unbox b}}})
-                mt-env
-                mt-store)
-        (v*s (numV 6)
-             (override-store (cell 1 (numV 6))
-                             (override-store (cell 1 (numV 5))
-                                             mt-store))))
-
   (test/exn (interp (parse '{1 2}) mt-env mt-store)
             "not a function")
   (test/exn (interp (parse '{+ 1 {lambda {x} x}}) mt-env mt-store)
@@ -343,6 +366,26 @@
    [else (if (equal? l (cell-location (first sto)))
              (cell-val (first sto))
              (fetch l (rest sto)))]))
+
+(define (value-exists [l : Location] [sto : Store]) : boolean  
+;(local [(define f (fetch l sto))]
+  ;(if true #t #f)
+  (type-case Value (fetch l sto)
+    [numV (n) #t]
+    [else #f])  
+  ;)
+)
+
+(define (remove-cell [l : Location] [sto : Store]) : Store
+
+  (cond
+    [(empty? sto) sto]
+  
+    [else (if (equal? l (cell-location (first sto)))
+              (rest sto)
+              (remove-cell l (rest sto)))])
+  )
+
 
 (module+ test
   (test (max-address mt-store)

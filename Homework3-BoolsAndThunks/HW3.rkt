@@ -4,7 +4,8 @@
 (define-type Value
   [numV (n : number)]
   [boolV (b : boolean)]
-  [thunkV (t : ExprC)] ;(add an env)
+  [thunkV (t : ExprC)
+          (env : Env)] ;(add an env)
   [closV (arg : symbol)
          (body : ExprC)
          (env : Env)])
@@ -153,15 +154,17 @@
                         [else (interp r env)])]
            [else (error 'interp "not a boolean")])
          ]
-    [delayC (v) (thunkV v)] 
-    [forceC (v)
-            (type-case Value (interp v env)
-              [thunkV (t) (interp t env)]
-              [else (error 'interp "not a thunk")])]
-    [forceC (body)
-            (type-case Value body
-              [thunkV (v) (interp v env)]
-              [else (error 'interp "not a thunk")])]
+    [delayC (body) (thunkV body env)] 
+    [forceC (thunk-expr) (type-case Value (interp thunk-expr env)
+                  [thunkV (v e) (interp v e)]
+            [else (error 'interp "not a thunk")])]
+            ;(type-case Value (interp v env)
+             ; [thunkV (t) (interp t env)]
+              ;[else (error 'interp "not a thunk")])]
+    ;[forceC (body)
+     ;       (type-case Value body
+      ;        [thunkV (v) (interp v env)]
+       ;       [else (error 'interp "not a thunk")])]
     
     [appC (fun arg) (type-case Value (interp fun env)
                       [closV (n body c-env)
@@ -244,7 +247,8 @@
 
   ;;1
   (test (interp (parse '{delay {+ 1 {lambda {x} x}}}) mt-env)
-        (thunkV (plusC (numC 1) (lamC 'x (idC 'x)))))
+        (thunkV (plusC (numC 1) (lamC 'x (idC 'x))) mt-env))
+  
   ;;2
   (test/exn (interp (parse '{force 1})
                     mt-env)
