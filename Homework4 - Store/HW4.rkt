@@ -28,8 +28,8 @@
   [unboxC (arg : ExprC)]
   [setboxC (bx : ExprC)
            (val : ExprC)]
-  [beginC (l : ExprC)
-          (r : ExprC)])
+  [beginC (exprs : (listof ExprC))])
+          
 
 (define-type Binding
   [bind (name : symbol)
@@ -80,12 +80,24 @@
      (boxC (parse (second (s-exp->list s))))]
     [(s-exp-match? '{unbox ANY} s)
      (unboxC (parse (second (s-exp->list s))))]
+    
+         
     [(s-exp-match? '{set-box! ANY ANY} s)
      (setboxC (parse (second (s-exp->list s)))
               (parse (third (s-exp->list s))))]
+    
+    
+    [(s-exp-match? '{begin ANY ...} s)
+     (beginC (map parse (rest (s-exp->list s))))]
+     ;(beginC (parse (second (s-exp->list s)))
+      ;       (parse (third (s-exp->list s))))]    
+
+    #|
     [(s-exp-match? '{begin ANY ANY} s)
      (beginC (parse (second (s-exp->list s)))
              (parse (third (s-exp->list s))))]
+    |#
+
     [(s-exp-match? '{ANY ANY} s)
      (appC (parse (first (s-exp->list s)))
            (parse (second (s-exp->list s))))]
@@ -118,7 +130,7 @@
   (test (parse '{set-box! b 0})
         (setboxC (idC 'b) (numC 0)))
   (test (parse '{begin 1 2})
-        (beginC (numC 1) (numC 2)))
+        (beginC (list (numC 1) (numC 2))))
   (test/exn (parse '{{+ 1 2}})
             "invalid input"))
 
@@ -190,12 +202,24 @@
                          )]
 
                    [else (error 'interp "not a box")])))]
-    
-    [beginC (l r)
-            (with [(v-l sto-l) (interp l env sto)]
-              (interp r env sto-l))]))
+    [beginC (e)
+            (unfold e env sto)]))
+               
 
 (module+ test
+
+  (test (interp (parse '{let {[b {box 1}]}
+                          {begin
+                            {set-box! b {+ 2 {unbox b}}}
+                            {set-box! b {+ 3 {unbox b}}}
+                            {set-box! b {+ 4 {unbox b}}}
+                            {unbox b}}})
+                mt-env
+                mt-store)
+        (v*s (numV 10)
+             (override-store (cell 1 (numV 10))
+                             mt-store)))
+  
 (test (interp (parse '{let {[b {box 1}]}
                           {begin
                            {set-box! b 2}
@@ -367,25 +391,27 @@
              (cell-val (first sto))
              (fetch l (rest sto)))]))
 
+;; Check if a value exists in the address of the store already
 (define (value-exists [l : Location] [sto : Store]) : boolean  
-;(local [(define f (fetch l sto))]
-  ;(if true #t #f)
   (type-case Value (fetch l sto)
     [numV (n) #t]
     [else #f])  
-  ;)
 )
 
+;; Remove cell from selected cell location.
 (define (remove-cell [l : Location] [sto : Store]) : Store
-
   (cond
     [(empty? sto) sto]
-  
     [else (if (equal? l (cell-location (first sto)))
               (rest sto)
-              (remove-cell l (rest sto)))])
-  )
+              (remove-cell l (rest sto)))]))  
 
+;; Interp through the whole list given.
+(define (unfold [e : (listof ExprC)] [env : Env] [sto : Store]) : Result
+  (cond
+    [(= (length e) 1) (interp (first e) env sto)]
+    [else (with [(v-l sto-l) (interp (first e) env sto)]
+                (unfold (rest e) env sto-l))]))
 
 (module+ test
   (test (max-address mt-store)
