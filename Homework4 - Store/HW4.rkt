@@ -192,22 +192,22 @@
                (with [(v-v sto-v) (interp val env sto-b)]
                  (type-case Value v-b
                    [boxV (l)
-                         (if (value-exists l sto-v)
+                         ;(if (value-exists l sto-v)
                              (v*s v-v
                                   (override-store (cell l v-v)
                                                   (remove-cell l sto-v)))
-                             (v*s v-v
-                              (override-store (cell l v-v)
-                                              sto-v))
-                         )]
-
+                          ;   (v*s v-v
+                           ;   (override-store (cell l v-v)
+                            ;                  sto-v))
+                         ]
                    [else (error 'interp "not a box")])))]
     [beginC (e)
             (unfold e env sto)]))
-               
+              
 
 (module+ test
 
+  ;;beginC tests -----------------------------------------
   (test (interp (parse '{let {[b {box 1}]}
                           {begin
                             {set-box! b {+ 2 {unbox b}}}
@@ -220,36 +220,74 @@
              (override-store (cell 1 (numV 10))
                              mt-store)))
   
-(test (interp (parse '{let {[b {box 1}]}
+ 
+
+  (test (interp (parse '{let {[b {box 1}]}
                           {begin
-                           {set-box! b 2}
-                           {unbox b}}})
+                            {set-box! b {+ 2 {unbox b}}}
+                            {set-box! b {+ 3 {unbox b}}}
+                            {set-box! b {+ 4 {unbox b}}}
+                            {unbox b}}})
+                mt-env
+                mt-store)
+        (v*s (numV 10)
+             (override-store (cell 1 (numV 10))
+                             mt-store)))
+
+  (test (interp (parse '{let {[b {box 2}]}
+                          {let {[c {box 1}]}
+                            {begin
+                              {set-box! b 2}
+                              {unbox b}}}})
                 mt-env
                 mt-store)
         (v*s (numV 2)
              (override-store (cell 1 (numV 2))
                              mt-store)))
 
-
+  ;;setboxC tests -----------------------------------------
   (test (interp (parse '{set-box! {box 5} 6})
                 mt-env
                 mt-store)
         (v*s (numV 6)
-             (override-store (cell 1 (numV 6))                             
+             (override-store (cell 1 (numV 6))                
                                              mt-store)))
-  
+  (test (interp (parse '{set-box! {box 5} 6})
+                mt-env
+                mt-store)
+        (v*s (numV 6)
+             (override-store (cell 1 (numV 6))                
+                                             mt-store)))
   (test (interp (parse '{let {[b (box 5)]}
                           {begin
                             {set-box! b 6}
                             {unbox b}}})
                 mt-env
-                mt-store)
-        
-        
+                mt-store)               
         (v*s (numV 6)
              (override-store (cell 1 (numV 6))                             
-                                             mt-store)))
+                             mt-store)))
   
+
+  (test (interp (parse '{let {[b {box 2}]}                    
+                            {begin
+                              {set-box! {box 3} 3}
+                              {unbox b}}})
+                mt-env
+                mt-store)
+            (v*s (numV 2)
+                 (list (cell 2 (numV 3)) (cell 1 (numV 2)))))
+  
+  (test/exn (interp (parse '{let {[b {box 2}]}                    
+                            {begin
+                              {set-box! 3 3}
+                              {unbox b}}})
+                mt-env
+                mt-store)
+            "not a box")
+                           
+
+  ;;------------------------------------------------------
  
   (test (interp (parse '2) mt-env mt-store)
         (v*s (numV 2) 
@@ -314,7 +352,10 @@
         (v*s (numV 5)
              (override-store (cell 1 (numV 5))
                              mt-store)))
-  
+  (test/exn (interp (parse '{unbox 5})
+                mt-env
+                mt-store)
+        "not a box")
 
 (test (interp (parse '{begin 1 2})
                 mt-env
@@ -393,9 +434,9 @@
 
 ;; Check if a value exists in the address of the store already
 (define (value-exists [l : Location] [sto : Store]) : boolean  
-  (type-case Value (fetch l sto)
+  (type-case Value (my-fetch l sto)
     [numV (n) #t]
-    [else #f])  
+    [else #f])
 )
 
 ;; Remove cell from selected cell location.
@@ -432,4 +473,7 @@
                                                  mt-store)))
         (numV 9))
   (test/exn (fetch 2 mt-store)
-            "unallocated location"))
+            "unallocated location")
+  
+  (test (value-exists 2 mt-store)
+            #f))
