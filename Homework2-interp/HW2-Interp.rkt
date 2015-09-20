@@ -19,8 +19,7 @@
   [unletC (q : symbol) (body : ExprC)]
   [letC (n : symbol) 
         (rhs : ExprC)
-        (body : ExprC)]
-  
+        (body : ExprC)] 
   )
 
 (define-type FunDefC
