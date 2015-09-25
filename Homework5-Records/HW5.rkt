@@ -4,10 +4,12 @@
 (define-type-alias Location number)
 
 (define-type Value
-  [numV (n : number)]
+  [numV (n : number)]  
   [closV (arg : symbol)
          (body : ExprC)
-         (env : Env)])
+         (env : Env)]
+  [recV (ns : (listof symbol))
+        (vs : (listof Value))])  
 
 (define-type ExprC
   [numC (n : number)]
@@ -26,7 +28,11 @@
   [setC (var : symbol)
         (val : ExprC)]
   [beginC (l : ExprC)
-          (r : ExprC)])
+          (r : ExprC)]
+  [recordC (ns : (listof symbol))
+           (args : (listof ExprC))]
+  [getC (rec : ExprC)
+        (n : symbol)])
 
 (define-type Binding
   [bind (name : symbol)
@@ -142,6 +148,18 @@
                                       sto-rhs))))]
     [lamC (n body)
           (v*s (closV n body env) sto)]
+
+    ;;Start here -------------------------------------------------------
+    [recordC (ns as) (v*s (numV 0) sto)]
+             ;(recV ns
+              ;     (map (lambda (a) (interp a env))
+               ;         as))]
+    [getC (a n) (v*s (numV 0) sto)]
+          ;(type-case Value (interp a env sto)
+           ; [recV (ns vs) (find n ns vs)]
+            ;[else (error 'interp "not a record")])]
+    ;;------------------------------------------------------------------
+    
     [appC (fun arg)
           (with [(v-f sto-f) (interp fun env sto)]
             (with [(v-a sto-a) (interp arg env sto-f)]
@@ -165,6 +183,23 @@
               (interp r env sto-l))]))
 
 (module+ test
+
+  #|;; Start Tests for Records with Store ________________________________________
+  (test (interp-expr (parse '{+ 1 4}))
+        '5)
+  (test (interp-expr (parse '{record {a 10} {b {+ 1 2}}}))
+        `record)
+  (test (interp-expr (parse '{get {record {a 10} {b {+ 1 0}}} b}))
+        '1)
+  (test/exn (interp-expr (parse '{get {record {a 10}} b}))
+            "no such field")
+  (test (interp-expr (parse '{get {record {r {record {z 0}}}} r}))
+        `record)
+  (test (interp-expr (parse '{get {get {record {r {record {z 0}}}} r} z}))
+        '0)
+  ;; End Tests for Records with Store __________________________________________
+  |#
+  
   (test (interp (parse '2) mt-env mt-store)
         (v*s (numV 2) 
              mt-store))
@@ -330,3 +365,42 @@
         (numV 9))
   (test/exn (fetch 2 mt-store)
             "unallocated location"))
+;; find & update ----------------------------------------
+
+;; Takes a name and two parallel lists, returning an item from the
+;; second list where the name matches the item from the first list.
+(define (find [n : symbol] [ns : (listof symbol)] [vs : (listof Value)])
+  : Value
+  (cond
+   [(empty? ns) (error 'interp "no such field")]
+   [else (if (symbol=? n (first ns))
+             (first vs)
+             (find n (rest ns) (rest vs)))]))
+
+;; Takes a name n, value v, and two parallel lists, returning a list
+;; like the second of the given lists, but with v in place
+;; where n matches the item from the first list.
+(define (update [n : symbol] [v : Value]
+                [ns : (listof symbol)] [vs : (listof Value)])
+  : (listof Value)
+  (cond
+   [(empty? ns) (error 'interp "no such field")]
+   [else (if (symbol=? n (first ns))
+             (cons v (rest vs))
+             (cons (first vs) 
+                   (update n v (rest ns) (rest vs))))]))
+
+(module+ test
+  (test (find 'a (list 'a 'b) (list (numV 1) (numV 2)))
+        (numV 1))
+  (test (find 'b (list 'a 'b) (list (numV 1) (numV 2)))
+        (numV 2))
+  (test/exn (find 'a empty empty)
+            "no such field")
+
+  (test (update 'a (numV 0) (list 'a 'b) (list (numV 1) (numV 2)))
+        (list (numV 0) (numV 2)))
+  (test (update 'b (numV 0) (list 'a 'b) (list (numV 1) (numV 2)))
+        (list (numV 1) (numV 0)))
+  (test/exn (update 'a (numV 0) empty empty)
+            "no such field"))
