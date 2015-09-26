@@ -9,7 +9,8 @@
          (body : ExprC)
          (env : Env)]
   [recV (ns : (listof symbol))
-        (vs : (listof Value))])  
+        (vs : (listof Value))]
+  [boxV (l : Location)])
 
 (define-type ExprC
   [numC (n : number)]
@@ -32,7 +33,12 @@
   [recordC (ns : (listof symbol))
            (args : (listof ExprC))]
   [getC (rec : ExprC)
-        (n : symbol)])
+        (n : symbol)]
+  [boxC (arg : ExprC)]
+  [unboxC (arg : ExprC)]
+  [setboxC (bx : ExprC)
+           (val : ExprC)])
+  
 
 (define-type Binding
   [bind (name : symbol)
@@ -82,6 +88,15 @@
     [(s-exp-match? '{set! SYMBOL ANY} s)
      (setC (s-exp->symbol (second (s-exp->list s)))
            (parse (third (s-exp->list s))))]
+    
+    [(s-exp-match? '{box ANY} s)
+     (boxC (parse (second (s-exp->list s))))]
+    [(s-exp-match? '{unbox ANY} s)
+     (unboxC (parse (second (s-exp->list s))))]
+    [(s-exp-match? '{set-box! ANY ANY} s)
+     (setboxC (parse (second (s-exp->list s)))
+              (parse (third (s-exp->list s))))]
+    
     [(s-exp-match? '{begin ANY ANY} s)
      (beginC (parse (second (s-exp->list s)))
              (parse (third (s-exp->list s))))]
@@ -178,13 +193,45 @@
               (v*s v-v
                    (override-store (cell l v-v)
                                    sto-v))))]
+
+    [boxC (a)
+          (with [(v sto-v) (interp a env sto)]
+                (let ([l (new-loc sto-v)])
+                  (v*s (boxV l) 
+                       (override-store (cell l v) 
+                                       sto-v))))]
+    [unboxC (a)
+            (with [(v sto-v) (interp a env sto)]
+                  (type-case Value v
+                    [boxV (l) (v*s (fetch l sto-v) 
+                                   sto-v)]
+                    [else (error 'interp "not a box")]))]
+    [setboxC (bx val)
+             (with [(v-b sto-b) (interp bx env sto)]
+                   (with [(v-v sto-v) (interp val env sto-b)]
+                         (type-case Value v-b
+                           [boxV (l)
+                                 (v*s v-v
+                                      (override-store (cell l v-v)
+                                                      sto-v))]
+                           [else (error 'interp "not a box")])))]
+    
     [beginC (l r)
             (with [(v-l sto-l) (interp l env sto)]
-              (interp r env sto-l))]))
+                  (interp r env sto-l))]))
+
+(define (interp-expr (a : ExprC)) : s-expression  
+             ;(type-case Value (Result-v (interp a mt-env mt-sto))
+               (with [(v-l sto-l) (interp a mt-env mt-store)]
+                     (type-case Value v-l
+                     [numV (n) (number->s-exp n)]
+                     [closV (arg bod env) `function]
+                     [recV (ns vs) `record]
+                     [boxV (l) `box])))
 
 (module+ test
 
-  #|;; Start Tests for Records with Store ________________________________________
+  ;; Start Tests for Records with Store ________________________________________
   (test (interp-expr (parse '{+ 1 4}))
         '5)
   (test (interp-expr (parse '{record {a 10} {b {+ 1 2}}}))
@@ -198,7 +245,7 @@
   (test (interp-expr (parse '{get {get {record {r {record {z 0}}}} r} z}))
         '0)
   ;; End Tests for Records with Store __________________________________________
-  |#
+  
   
   (test (interp (parse '2) mt-env mt-store)
         (v*s (numV 2) 
