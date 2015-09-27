@@ -87,7 +87,7 @@
               (parse (third (s-exp->list s))))]
     
     
-    [(s-exp-match? '{begin ANY ...} s)
+    [(s-exp-match? '{begin ANY ANY ...} s)
      (beginC (map parse (rest (s-exp->list s))))]
      ;(beginC (parse (second (s-exp->list s)))
       ;       (parse (third (s-exp->list s))))]    
