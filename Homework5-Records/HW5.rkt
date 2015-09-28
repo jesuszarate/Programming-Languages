@@ -8,8 +8,9 @@
   [errorV (s : string)]
   [closV (arg : symbol)
          (body : ExprC)
-         (env : Env)]
-  [recV (ns : (listof symbol))
+         (env : Env)] 
+  [recV (d : ExprC)
+        (ns : (listof symbol))
         (vs : (listof Value))]
   [boxV (l : Location)])
 
@@ -34,8 +35,9 @@
         (val : ExprC)]
   [beginC (l : ExprC)
           (r : ExprC)]
-  [recordC (ns : (listof symbol))
-           (vs : (listof ExprC))]
+  [recordC (d : ExprC)
+           (ns : (listof symbol))
+           (vs : (listof ExprC))]           
   
   ;;Start Recond/handle___________________
   [record/handleC (err : ExprC)
@@ -100,8 +102,9 @@
 
     
     ;;Start Record ___________________________________________________________
-    [(s-exp-match? '{record {SYMBOL ANY} ...} s)
-     (recordC (map (lambda (l) (s-exp->symbol (first (s-exp->list l))))
+    [(s-exp-match? '{record {SYMBOL ANY} ...} s)     
+     (recordC (errorC "no such field")
+              (map (lambda (l) (s-exp->symbol (first (s-exp->list l))));
                    (rest (s-exp->list s)))
               (map (lambda (l) (parse (second (s-exp->list l))))
                    (rest (s-exp->list s))))]
@@ -218,15 +221,14 @@
           (v*s (closV n body env) sto)]
 
     ;;Start Record -------------------------------------------------------
-    [recordC (ns vs)             
-             (v*s (recV ns (evaluate-list vs env sto)) sto)]
+    [recordC (d ns vs)             
+             (v*s (recV d ns (evaluate-list vs env sto)) sto)]
     [getC (a n)
-          (with [(v-a sto-a) (interp a env sto)]
+          (with [(v-a sto-a) (interp a env sto)]                
                 (type-case Value v-a                  
-                    [recV (ns vs) (let ([whatever (numV 2)])
-                                    (v*s                                   
-                                     (find-w-error (errorV "ouch") n ns vs)
-                                     sto))]
+                  [recV (d ns vs) (let ([whatever (numV 2)])
+                                    (with [(v-d sto-d) (interp d env sto)]
+                                          (v*s (find-w-error v-d n ns vs) sto)))]
                   [else (error 'interp "not a record")]))]
           #|
           (with [(v-a sto-a) (interp a env sto)]          
@@ -239,9 +241,9 @@
     
     ;;Start Record/Handle _______________________________________________________
     [record/handleC (err ns vs)
-                    (v*s (recV ns (evaluate-list vs env sto)) sto)]
+                    (v*s (recV err ns (evaluate-list vs env sto)) sto)]
     
-    [errorC (e) (v*s (numV 0) sto)]
+    [errorC (e) (v*s (errorV e) sto)]
     ;;End Record/Handle _________________________________________________________
 
     
@@ -270,12 +272,13 @@
            (let ([l (get-location n env sto)])                     
              (with [(v-n sto-n) (interp n env sto)]                  
                    (type-case Value v-n                     
-                     [recV (ns vs)                           
-                           (with [(v-val sto-val) (interp val env sto-n)]                              
-                                 (let ([newVar (replace-var var v-val ns vs)])
+                     [recV (d ns vs)                           
+                           (with [(v-val sto-val) (interp val env sto-n)]
+                                 ;(with [(v-d sto-d) (interp d env sto-n)]
+                                 (let ([newVar (replace-var (errorC "") var v-val ns vs)])
                                    (v*s newVar
-                                        (override-store (cell l newVar) sto-val))))]                                        
-                     [else  (error 'interp "give me a better error name")])))]    
+                                        (override-store (cell l newVar) sto-val))))]
+                     [else  (error 'interp "give me a better error name")])))]
 
     
     ;;End_____________________________________________________
@@ -311,7 +314,7 @@
                      (type-case Value v-l
                        [numV (n) (number->s-exp n)]
                        [closV (arg bod env) `function]
-                       [recV (ns vs) `record]
+                       [recV (d ns vs) `record]
                        [boxV (l) `box]
                        [errorV (e) (string->s-exp e)])))
 
@@ -328,9 +331,9 @@
                                {get r x}}))
         '1)
 
-  ;(test (interp-expr (parse '{let {[r {record/handle 5 {x 1}}]}
-   ;                            {get r y}}))
-    ;    '5)
+  (test (interp-expr (parse '{let {[r {record/handle 5 {x 1}}]}
+                               {get r y}}))
+        '5)
 
   (test/exn (interp-expr (parse '{let {[r {record/handle {error "ouch"} {x 1}}]}
                                    {get r y}}))
@@ -591,8 +594,7 @@
 (define (find-w-error [err : Value][n : symbol] [ns : (listof symbol)] [vs : (listof Value)])
   : Value
   (cond
-   [(empty? ns) err]                 
-                
+   [(empty? ns) err]                                 
    [else (if (symbol=? n (first ns))
              (first vs)
              (find-w-error err n (rest ns) (rest vs)))])
@@ -638,10 +640,10 @@
           (cons v-e (evaluate-list (rest lst) env sto-e)))]))
 
 
-(define (replace-var [n : symbol] [val : Value] [ns : (listof symbol)] [vs : (listof Value)]) : Value
+(define (replace-var [d : ExprC] [n : symbol] [val : Value] [ns : (listof symbol)] [vs : (listof Value)]) : Value
   (let ([new-vs (remove-val n ns vs)])
     (let ([new-ns (remove-var n ns)])
-      (recV (cons n new-ns) (cons val new-vs))
+      (recV d (cons n new-ns) (cons val new-vs))
     ))
   )
 
