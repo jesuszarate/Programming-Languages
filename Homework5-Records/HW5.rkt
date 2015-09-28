@@ -4,7 +4,8 @@
 (define-type-alias Location number)
 
 (define-type Value
-  [numV (n : number)]  
+  [numV (n : number)]
+  [errorV (s : string)]
   [closV (arg : symbol)
          (body : ExprC)
          (env : Env)]
@@ -34,7 +35,15 @@
   [beginC (l : ExprC)
           (r : ExprC)]
   [recordC (ns : (listof symbol))
-           (args : (listof ExprC))]
+           (vs : (listof ExprC))]
+  
+  ;;Start Recond/handle___________________
+  [record/handleC (err : ExprC)
+                  (ns : (listof symbol))
+                  (vs : (listof ExprC))]
+  [errorC (err : string)]
+  ;;End Recond/handle_____________________
+  
   [getC (rec : ExprC)
         (n : symbol)]
   [boxC (arg : ExprC)]
@@ -88,7 +97,9 @@
      (lamC (s-exp->symbol (first (s-exp->list 
                                   (second (s-exp->list s)))))
            (parse (third (s-exp->list s))))]
+
     
+    ;;Start Record ___________________________________________________________
     [(s-exp-match? '{record {SYMBOL ANY} ...} s)
      (recordC (map (lambda (l) (s-exp->symbol (first (s-exp->list l))))
                    (rest (s-exp->list s)))
@@ -97,14 +108,37 @@
     [(s-exp-match? '{get ANY SYMBOL} s)
      (getC (parse (second (s-exp->list s)))
            (s-exp->symbol (third (s-exp->list s))))]
+    ;;End Record ___________________________________________________________
+
+
+    ;;Start Record/Handle ___________________________________________________________
+
+    [(s-exp-match? '{record/handle ANY {SYMBOL ANY} ...} s)
+     (record/handleC (parse (second (s-exp->list s)))
+                     (let ([what  (second (rest (s-exp->list s)))])
+                       (map (lambda (l)                            
+                              (s-exp->symbol (first (s-exp->list l))))                            
+                            (rest (rest (s-exp->list s)))))                       
+                     (map (lambda (l)
+                            (parse (second (s-exp->list l))))
+                          (rest (rest (s-exp->list s)))))]
+     
+
+    ;;Start Record/Handle ___________________________________________________________
+
     
     [(s-exp-match? '{set! SYMBOL ANY} s)
      (setC (s-exp->symbol (second (s-exp->list s)))
            (parse (third (s-exp->list s))))]
+
+    
+    ;;Start Set ___________________________________________________________
     [(s-exp-match? '{set ANY SYMBOL ANY} s)
      (set2C (parse (second (s-exp->list s)))
       (s-exp->symbol (third (s-exp->list s)))
            (parse (fourth (s-exp->list s))))]
+    ;;End Set _____________________________________________________________   
+
     
     [(s-exp-match? '{box ANY} s)
      (boxC (parse (second (s-exp->list s))))]
@@ -181,15 +215,33 @@
     [lamC (n body)
           (v*s (closV n body env) sto)]
 
-    ;;Start here -------------------------------------------------------
-    [recordC (ns as)             
-             (v*s (recV ns (evaluate-list as env sto)) sto)]
+    ;;Start Record -------------------------------------------------------
+    [recordC (ns vs)             
+             (v*s (recV ns (evaluate-list vs env sto)) sto)]
     [getC (a n)
+          (with [(v-a sto-a) (interp a env sto)]
+                (type-case Value v-a                  
+                    [recV (ns vs) (let ([whatever (numV 2)])
+                                    (v*s                                   
+                                     (find-w-error (errorV "Bloody wrong") n ns vs)
+                                     sto))]
+                  [else (error 'interp "not a record")]))]
+          #|
           (with [(v-a sto-a) (interp a env sto)]          
                 (type-case Value v-a
                   [recV (ns vs) (v*s (find n ns vs) sto)]
                   [else (error 'interp "not a record")]))]
-    ;;------------------------------------------------------------------
+          |#
+    ;;End Record -------------------------------------------------------
+
+    
+    ;;Start Record/Handle _______________________________________________________
+    [record/handleC (err ns vs)
+                    (v*s (recV ns (evaluate-list vs env sto)) sto)]
+    
+    [errorC (e) (v*s (numV 0) sto)]
+    ;;End Record/Handle _________________________________________________________
+
     
     [appC (fun arg)
           (with [(v-f sto-f) (interp fun env sto)]
@@ -211,8 +263,7 @@
                                    sto-v))))]
     ;;Start___________________________________________________
 
-
-    ; Var is what we want replaced
+    
     [set2C (n var val)
            (let ([l (get-location n env sto)])                     
              (with [(v-n sto-n) (interp n env sto)]                  
@@ -256,10 +307,11 @@
 (define (interp-expr (a : ExprC)) : s-expression  
                (with [(v-l sto-l) (interp a mt-env mt-store)]
                      (type-case Value v-l
-                     [numV (n) (number->s-exp n)]
-                     [closV (arg bod env) `function]
-                     [recV (ns vs) `record]
-                     [boxV (l) `box])))
+                       [numV (n) (number->s-exp n)]
+                       [closV (arg bod env) `function]
+                       [recV (ns vs) `record]
+                       [boxV (l) `box]
+                       [errorV (e) (string->s-exp e)])))
 
 ;(define (interp [a : ExprC] [env : Env] [sto : Store]) : Result
 (define (get-location [e : ExprC] [env : Env] [sto : Store]) : Location
@@ -269,26 +321,54 @@
   )
 
 (module+ test
+  ;; Start Tests for Record/handle ________________________________________
+  (test (interp-expr (parse '{let {[r {record/handle 5 {x 1}}]}
+                               {get r x}}))
+        '1)
+
+  (test (interp-expr (parse '{let {[r {record/handle 5 {x 1}}]}
+                               {get r y}}))
+        '5)
+
+  (test/exn (interp-expr (parse '{let {[r {record/handle {error "ouch"} {x 1}}]}
+                                   {get r y}}))
+            "ouch")
+
+  (test (interp-expr (parse '{let {[r {record/handle {error "ouch"} {x 1}}]}
+                               {get r x}}))
+        '1)
+  
+  ;; End Tests for Record/handle ________________________________________
+  
   ;; Start Tests for Mutating Records ________________________________________
-  ;#|
+  #|
   (test (interp-expr (parse '{let {[r {record {x 1}}]}
                                {get r x}}))
         '1)
-  ;|#
+  
   (test (interp-expr (parse '{let {[r {record {x 1}}]}
                                {begin
-                                 {set r x 5}
+                                 {set r x 5}                                 
                                  {get r x}}}))
         '5)
 
+  (test (interp-expr (parse '{let {[r1 {record {x 1}}]}
+                               {let {[r2 r1]}
+                                 {begin
+                                   {set r1 x 2}
+                                   {get r2 x}}}}))
+                     '2)
   
   (test (interp-expr (parse '{let {[r {record {x 13} {y 22}}]}                               
                                {begin                               
                                  {set r x 5}
-                                 {get r x}}}))
-        '5) 
+                                 {begin
+                                   {set r x 13}
+                                   {get r x}}}}))
+        '13) 
   
-  ;#|
+  |#
+
   (test (interp-expr (parse '{let {[g {lambda {r} {get r a}}]}
                                {let {[s {lambda {r} {lambda {v} {set r b v}}}]}
                                  {let {[r1 {record {a 0} {b 2}}]}
@@ -503,6 +583,19 @@
    [else (if (symbol=? n (first ns))
              (first vs)
              (find n (rest ns) (rest vs)))]))
+
+(define (find-w-error [err : Value][n : symbol] [ns : (listof symbol)] [vs : (listof Value)])
+  : Value
+  (cond
+   [(empty? ns) err]                 
+                
+   [else (if (symbol=? n (first ns))
+             (first vs)
+             (find-w-error err n (rest ns) (rest vs)))])
+  )
+  
+  
+
 
 ;; Takes a name n, value v, and two parallel lists, returning a list
 ;; like the second of the given lists, but with v in place
