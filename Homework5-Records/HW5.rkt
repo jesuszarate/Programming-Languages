@@ -18,8 +18,8 @@
   ;|#
   #|
   [recV (d : ExprC)
-        (ns : (listof Location))
-        (vs : (listof Value)) ; Try listof locations instead.  
+        (ns : (listof symbol))
+        (vs : (listof Location)) ; Try listof locations instead.  
         (env : Env)]
   |#
   [boxV (l : Location)])
@@ -46,18 +46,18 @@
   [beginC (l : ExprC)
           (r : ExprC)]
   
-  ;;Start Recond___________________
+  ;;Start Record___________________
   [recordC (d : ExprC)
            (ns : (listof symbol))
            (vs : (listof ExprC))]           
-  ;;End Recond_____________________
+  ;;End Record_____________________
   
-  ;;Start Recond/handle___________________
+  ;;Start Record/handle___________________
   [record/handleC (err : ExprC)
                   (ns : (listof symbol))
                   (vs : (listof ExprC))]
   [errorC (err : string)]
-  ;;End Recond/handle_____________________
+  ;;End Record/handle_____________________
   
   [getC (rec : ExprC)
         (n : symbol)]
@@ -89,7 +89,6 @@
 
 (define-type Result-list-sto
   [l*s (l : (listof Value)) (s : Store)])
-
 
 (module+ test
   (print-only-errors true))
@@ -238,17 +237,19 @@
     
     ;;Start Record -------------------------------------------------------
     [recordC (d ns vs)
-             (type-case Result-list-sto (evaluate-list vs env sto)
+             (type-case Result-list-sto (evaluate-list ns vs env sto)
                [l*s (v-lst v-sto)
-                    (v*s (recV d ns v-lst env) v-sto)])]
+                    (let ([l (new-loc v-sto)])
+                      (with [(v-d s-d) (interp d env v-sto)]
+                            (v*s (recV d ns v-lst env) v-sto)))])]
     
     [getC (a n)
-          (with [(v-a sto-a) (interp a env sto)]                
+          (with [(v-a sto-a) (interp a env sto)]
                 (type-case Value v-a                  
                   [recV (d ns vs env) 
                         (if (exists d)
-                            (with [(v-d sto-d) (interp d env sto)] ; Check if the d exists first before we interpret.
-                                  (v*s (find-w-error v-d n ns vs) sto))
+                            (with [(v-d sto-d) (interp d env sto-a)] ; Check if the d exists first before we interpret.
+                                  (v*s (find-w-error v-d n ns vs) sto-d))
                             (error 'interp "does not exist"))]
                   [else (error 'interp "not a record")]))]         
     ;;End Record -------------------------------------------------------
@@ -256,7 +257,7 @@
     
     ;;Start Record/Handle _______________________________________________________
     [record/handleC (err ns vs)
-                    (type-case Result-list-sto (evaluate-list vs env sto)
+                    (type-case Result-list-sto (evaluate-list ns vs env sto)
                       [l*s (v-lst v-sto)
                            (v*s (recV err ns v-lst env) v-sto)])]
     
@@ -289,10 +290,13 @@
                  (let ([l (get-location v-n sto-n)])
                    (type-case Value v-n                     
                      [recV (d ns vs env-n)                           
-                           (with [(v-val sto-val) (interp val env sto-n)]                                 
-                                 (let ([newVar (replace-var var v-val ns vs env-n)])
-                                   (v*s newVar
-                                        (override-store (cell l newVar) sto-val))))]
+                           (with [(v-val sto-val) (interp val env sto-n)]
+                                 (let ([res (replace-var l d var v-val ns vs env-n sto-val)])
+                                 ;(v*s (numV 1) mt-store)
+                                  res ))]
+                                 ;(let ([newVar (replace-var l d var v-val ns vs env-n sto-val)])
+                                  ; (v*s newVar
+                                   ;     (override-store (cell l newVar) sto-val))))]
                      [else  (error 'interp "not a record")])))]
     
     
@@ -395,7 +399,7 @@
   
   ;|#
   
-  #|
+  ;#|
   (test (interp-expr (parse '{let {[g {lambda {r} {get r a}}]}
                                {let {[s {lambda {r} {lambda {v} {set r b v}}}]}
                                  {let {[r1 {record {a 0} {b 2}}]}
@@ -408,7 +412,7 @@
                                                {get r1 b}}
                                              {get r2 b}}}}}}}}))
         '5)
-  |#
+  ;|#
   ;|#
   ;; Start Tests for Mutating Records ________________________________________
   
@@ -660,22 +664,64 @@
             "no such field"))
 
 ;; Interprets every element in the list of exressions.
-(define (evaluate-list [lst : (listof ExprC)] [env : Env] [sto : Store]) : Result-list-sto
+(define (evaluate-list [ns : (listof symbol)][vs : (listof ExprC)] [env : Env] [sto : Store]) : Result-list-sto
   (cond
-    [(= (length lst) 1) (with [(v-e sto-e)(interp (first lst) env sto)]
+    [(= (length vs) 1) (with [(v-e sto-e)(interp (first vs) env sto)]
                               (l*s (list v-e) sto-e))]
-    [else (with [(v-e sto-e) (interp (first lst) env sto)]
-                (type-case Result-list-sto (evaluate-list (rest lst) env sto-e)
+    [else (with [(v-e sto-e) (interp (first vs) env sto)]
+                (type-case Result-list-sto (evaluate-list ns (rest vs) env sto-e)
                   [l*s (v-lst v-sto)
-                       (l*s (cons v-e v-lst) sto-e)]))]))
+                       (l*s (cons v-e v-lst) v-sto)]))]))
 
-
-(define (replace-var [n : symbol] [val : Value] [ns : (listof symbol)] [vs : (listof Value)] [env : Env]) : Value
+#|
+(define (replace-var [n : symbol] [val : Value] [ns : (listof symbol)] [vs : (listof Value)] [env : Env] [sto : val]) : Value
   (let ([new-vs (remove-val n ns vs)])
     (let ([new-ns (remove-var n ns)])
-      (recV (errorC "") (cons n new-ns) (cons val new-vs) env)
+      (recV (errorC "") (cons n new-ns) (cons val new-vs) mt-env)
       ))
   )
+|#
+(define (get-cell [l : Location] [sto : Store]) : Storage
+  (cond
+    [(empty? sto) (error 'get-cell "unknown location")]
+    [else (cond
+            [(equal? l (cell-location (first sto)))
+             (first sto)]
+            [else (get-cell l (rest sto))])]))
+
+(define (remove-cell [l : Location] [sto : Store]) : (listof Storage)
+  (cond
+    [(empty? sto) (error 'remove-cell "unknown location")]
+    [else (if (equal? l (cell-location (first sto)))
+              (rest sto)
+              (cons (first sto) (remove-cell l (rest sto))))])
+)
+
+(module+ test
+  (test (remove-cell 2 (override-store (cell 1 (numV 9))
+                                       (override-store (cell 2 (numV 5))
+                                                       (override-store (cell 3 (numV 6)) mt-env))))
+        (override-store (cell 1 (numV 9))                                       
+                        (override-store (cell 3 (numV 6)) mt-env)))
+  (test (remove-cell 1 (override-store (cell 1 (numV 9))
+                                       (override-store (cell 2 (numV 5))
+                                                       (override-store (cell 3 (numV 6)) mt-env))))
+        (override-store (cell 2 (numV 5))                                       
+                        (override-store (cell 3 (numV 6)) mt-env)))
+  (test/exn (remove-cell 5 (override-store (cell 1 (numV 9))
+                                       (override-store (cell 2 (numV 5))
+                                                       (override-store (cell 3 (numV 6)) mt-env))))
+        "unknown location")
+  )
+
+(define (replace-var [location : Location] [d : ExprC] [n : symbol] [val : Value] [ns : (listof symbol)] [vs : (listof Value)] [env : Env] [sto : Store]) : Result
+  (type-case Storage (get-cell location sto)
+    [cell (l v)         
+          ;(let ([new-vs (remove-val n ns vs)])
+           ; (let ([new-ns (remove-var n ns)])
+              (let ([newCell (recV d (cons n ns) (cons val vs) env)])
+                (let([newSto (remove-cell location sto)])
+                    (v*s newCell (override-store (cell location newCell) newSto))))]))
 
 (module+ test
   ;(test (replace-var 'x (numV 22) (list 'y 'x) (list (numV 1) (numV 2)))
@@ -685,8 +731,6 @@
 (define (replace-cell [n : symbol] [val : Value] [ns : (listof symbol)] [vs : (listof Value)] [env : Env] [sto : Store]) : Store
   (override-store (find-and-update (lookup n env) sto) mt-store)  
   )
-
-
 
 (define (find-and-update [l : Location] [sto : Store])
   (cond
@@ -707,7 +751,7 @@
     [(empty? ns) empty ]
     [else (if (equal? var (first ns))
               (rest vs)
-              (cons (first vs ) (remove-val var (rest ns) (rest vs))))])
+              (cons (first vs) (remove-val var (rest ns) (rest vs))))])
   )
 
 (define (remove-var [var : symbol] [ns : (listof symbol)]) : (listof symbol) 
