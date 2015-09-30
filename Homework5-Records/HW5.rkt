@@ -8,12 +8,20 @@
   [errorV (s : string)]
   [closV (arg : symbol)
          (body : ExprC)
-         (env : Env)] 
+         (env : Env)]
+
+  ;#|
   [recV (d : ExprC)
         (ns : (listof symbol))
         (vs : (listof Value)) ; Try listof locations instead.  
         (env : Env)]
-  
+  ;|#
+  #|
+  [recV (d : ExprC)
+        (ns : (listof Location))
+        (vs : (listof Value)) ; Try listof locations instead.  
+        (env : Env)]
+  |#
   [boxV (l : Location)])
 
 (define-type ExprC
@@ -136,7 +144,7 @@
     
     [(s-exp-match? '{error STRING} s)
      (errorC (s-exp->string (second (s-exp->list s))))]
-     
+    
     ;;Start Record/Handle ___________________________________________________________
     
     
@@ -233,7 +241,7 @@
              (type-case Result-list-sto (evaluate-list vs env sto)
                [l*s (v-lst v-sto)
                     (v*s (recV d ns v-lst env) v-sto)])]
-
+    
     [getC (a n)
           (with [(v-a sto-a) (interp a env sto)]                
                 (type-case Value v-a                  
@@ -276,9 +284,9 @@
     ;;Start set___________________________________________________
     
     
-    [set2C (n var val)
-           (let ([l (get-location n env sto)])                     
-             (with [(v-n sto-n) (interp n env sto)]                  
+    [set2C (n var val)                      
+           (with [(v-n sto-n) (interp n env sto)]
+                 (let ([l (get-location v-n sto-n)])
                    (type-case Value v-n                     
                      [recV (d ns vs env-n)                           
                            (with [(v-val sto-val) (interp val env sto-n)]                                 
@@ -325,11 +333,14 @@
           [boxV (l) `box]
           [errorV (e) (error 'interp-expr e)])))
 
-(define (get-location [e : ExprC] [env : Env] [sto : Store]) : Location
-  (type-case ExprC e
-    [idC (s) (lookup s env)]
-    [else (error 'interp "Not an identifier")])
-  )
+(define (get-location [e : Value] [sto : Store]) : Location
+  (cond
+    [(empty? sto) (error 'get-location "free expression")]
+    [else (cond
+            [(eq? e (cell-val (first sto)))
+             (cell-location (first sto))]
+            [else (get-location e (rest sto))])]))  
+
 
 (define (exists [e : ExprC]) : boolean
   #t
