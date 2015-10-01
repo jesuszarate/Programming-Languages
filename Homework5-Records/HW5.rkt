@@ -240,7 +240,7 @@
                   [recV (d ns vs env r-sto) 
                             (with [(v-d sto-d) (interp d env sto-a)] ; Check if the d exists first before we interpret.                                  
                                   (v*s (find-w-error v-d n ns vs r-sto) sto-d))]
-                  [else (error 'interp "not a record")]))]         
+                  [else (error 'interp "no such field")]))]         
     ;;End Record -------------------------------------------------------
     
     
@@ -305,13 +305,21 @@
             [else (get-location e (rest sto))])]))  
 
 (module+ test
-
-  (test/exn (interp-expr (parse '{get 5 x})) "not a record")
+  (test/exn (get-location (numV 1) mt-env) "free expression")
+  (test/exn (interp-expr (parse '{get 5 x})) "no such field")
+  (test/exn (interp-expr (parse '{let {[r 1]} {set r x 5}})) "not a record")
   ;; Start Tests for Record/handle ________________________________________
   ;#|
   (test (interp-expr (parse '{let {[r {record/handle 5 {x 1}}]}
                                {get r x}}))
         '1)
+  (test/exn (interp-expr (parse '{let {[r {record {x 1}}]}
+                               {+ r 1}}))
+        "not a number")
+
+  (test/exn (interp-expr (parse '{let {[r {record {x 1}}]}
+                               {r 1}}))
+        "not a function")
   
   (test (interp-expr (parse '{let {[r {record/handle 5 {x 1}}]}
                                {get r y}}))
@@ -391,6 +399,8 @@
   
   (test (interp-expr (parse '{record {a 10} {b {+ 1 2}}}))
         `record)
+
+  (test (interp-expr (parse '{lambda {a} {+ 1 2}})) `function)
   
   (test (interp-expr (parse '{get {record {a 10} {b {+ 1 0}}} b}))
         '1)
@@ -627,7 +637,7 @@
 
 (define (get-cell-location [s : symbol] [ns : (listof symbol)] [ls : (listof Location)]) : Location
   (cond
-    [(empty? ns) (error 'get-cell-location "unknown location")]
+    [(empty? ns) (error 'get-cell-location "no such field")]
     [else (cond
             [(equal? s (first ns))
              (first ls)]
@@ -642,6 +652,7 @@
   )
 
 (module+ test
+  (test/exn (get-cell-location 't (list 'r 's) (list 1 2)) "no such field")
   (test (remove-cell 2 (override-store (cell 1 (numV 9))
                                        (override-store (cell 2 (numV 5))
                                                        (override-store (cell 3 (numV 6)) mt-env))))
@@ -663,20 +674,6 @@
   (let ([l (get-cell-location n ns ls)])
     (let ([new-sto (remove-cell l sto)])
       (override-store (cell l val) new-sto))))
-
-(define (find-and-update [l : Location] [sto : Store])
-  (cond
-    [(empty? sto) (error 'interp "unallocated location")]
-    [else (if (equal? l (cell-location (first sto)))
-              (cell (cell-location (first sto))(cell-val (first sto)))
-              (find-and-update l (rest sto)))])
-  )
-
-(module+ test
-  (test (find-and-update 2 (override-store (cell 2 (numV 9))
-                                           mt-store))
-        (cell 2 (numV 9)))
-  )
 
 (define (remove-val [var : symbol] [ns : (listof symbol)] [vs : (listof Value)]) : (listof Value) 
   (cond
