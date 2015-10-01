@@ -219,26 +219,17 @@
     
     ;;Start Record -------------------------------------------------------
     [recordC (d ns vs)
-             ;(let ([new-locations (create-vs-locations vs env sto)])             
              (type-case Result-loclist-sto (create-vs-locations vs env sto)
                [loc*s (ll ss)                   
                       (with [(v-d s-d) (interp d env sto)]
                             (let ([n-sto (append sto ss)])
-                              (v*s (recV d ns ll env n-sto) n-sto)))])]
-    #|
-    [recordC (d ns vs)
-             (type-case Result-list-sto (evaluate-list ns vs env sto)
-               [l*s (v-lst v-sto)
-                    (let ([l (new-loc v-sto)])
-                      (with [(v-d s-d) (interp d env v-sto)]
-                            (v*s (recV d ns v-lst env) v-sto)))])]
-    |#
+                              (v*s (recV d ns ll env n-sto) n-sto)))])]    
     
     [getC (a n)
           (with [(v-a sto-a) (interp a env sto)]
                 (type-case Value v-a
-                  [recV (d ns vs env r-sto) 
-                            (with [(v-d sto-d) (interp d env sto-a)] ; Check if the d exists first before we interpret.                                  
+                  [recV (d ns vs n-env r-sto) 
+                            (with [(v-d sto-d) (interp d n-env sto-a)] ; Check if the d exists first before we interpret.                                  
                                   (v*s (find-w-error v-d n ns vs r-sto) sto-d))]
                   [else (error 'interp "no such field")]))]         
     ;;End Record -------------------------------------------------------
@@ -274,9 +265,8 @@
                  (let ([l (get-location v-n sto-n)])
                    (type-case Value v-n                     
                      [recV (d ns ls env-n r-sto)                           
-                           (with [(v-val sto-val) (interp val env sto-n)]
+                           (with [(v-val sto-val) (interp val env-n sto-n)]
                                  (let ([rec-sto (replace-rec var v-val ns ls env-n r-sto)])
-                                   ;(let ([c-sto (replace-var var sto-val rec-sto)])
                                    (let ([newc (cell l (recV d ns ls env-n rec-sto))])                                     
                                      (v*s v-val (override-store newc sto-val)))))]
                      [else  (error 'interp "not a record")])))]
@@ -305,6 +295,12 @@
             [else (get-location e (rest sto))])]))  
 
 (module+ test
+
+  ;(test (interp-expr (parse '{quote {let {{z 1}}
+   ;                                   {begin {record {x {set! z 2}}} z}}}))
+    ;    '2)
+  
+
   (test/exn (get-location (numV 1) mt-env) "free expression")
   (test/exn (interp-expr (parse '{get 5 x})) "no such field")
   (test/exn (interp-expr (parse '{let {[r 1]} {set r x 5}})) "not a record")
