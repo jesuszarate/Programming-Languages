@@ -106,6 +106,105 @@
                       [else (error 'interp "not a function")])]))
 
 (module+ test
+  (test (interp-expr (parse '10))
+        '10)
+  (test (interp-expr (parse '{+ 10 17}))
+        '27)
+  (test (interp-expr (parse '{* 10 7}))
+        '70)
+  (test (interp-expr (parse '{{lambda {x} {+ x 12}}
+                              {+ 1 17}}))
+        '30)
+  
+  (test (interp-expr (parse '{let {[x 0]}
+                               {let {[f {lambda {y} {+ x y}}]}
+                                 {+ {f 1}
+                                    {let {[x 3]}
+                                      {f 2}}}}}))
+        '3)
+  
+  (test (interp-expr (parse '{if0 0 1 2}))
+        '1)
+  (test (interp-expr (parse '{if0 1 1 2}))
+        '2)
+  
+  (test (interp-expr (parse '{cons 1 2}))
+        `cons)
+  (test (interp-expr (parse '{first {cons 1 2}}))
+        '1)
+  (test (interp-expr (parse '{rest {cons 1 2}}))
+        '2)
+  
+  ;; Lazy evaluation:
+  (test (interp-expr (parse '{{lambda {x} 0}
+                              {+ 1 {lambda {y} y}}}))
+        '0)
+  (test (interp-expr (parse '{let {[x {+ 1 {lambda {y} y}}]}
+                               0}))
+        '0)
+  (test (interp-expr (parse '{first {cons 3
+                                          {+ 1 {lambda {y} y}}}}))
+        '3)
+  (test (interp-expr (parse '{rest {cons {+ 1 {lambda {y} y}}
+                                         4}}))
+        '4)
+  (test (interp-expr (parse '{first {cons 5
+                                          ;; Infinite loop:
+                                          {{lambda {x} {x x}}
+                                           {lambda {x} {x x}}}}}))
+        '5)
+  
+  (test (interp-expr 
+         (parse 
+          '{let {[mkrec
+                  ;; This is call-by-name mkrec
+                  ;;  (simpler than call-by-value):
+                  {lambda {body-proc}
+                    {let {[fX {lambda {fX}
+                                {body-proc {fX fX}}}]}
+                      {fX fX}}}]}
+              {let {[fib
+                     {mkrec
+                      {lambda {fib}
+                        ;; Fib:
+                        {lambda {n}
+                          {if0 n
+                               1
+                               {if0 {+ n -1}
+                                    1
+                                    {+ {fib {+ n -1}}
+                                       {fib {+ n -2}}}}}}}}]}
+                ;; Call fib on 4:
+                {fib 4}}}))
+        '5)
+
+  (test (interp-expr 
+         (parse 
+          '{let {[mkrec
+                  ;; This is call-by-name mkrec
+                  ;;  (simpler than call-by-value):
+                  {lambda {body-proc}
+                    {let {[fX {lambda {fX}
+                                {body-proc {fX fX}}}]}
+                      {fX fX}}}]}
+             {let {[nats-from
+                    {mkrec
+                     {lambda {nats-from}
+                       ;; nats-from:
+                       {lambda {n}
+                         {cons n {nats-from {+ n 1}}}}}}]}
+               {let {[list-ref
+                      {mkrec
+                       {lambda {list-ref}
+                         ;; list-ref:
+                         {lambda {n}
+                           {lambda {l}
+                             {if0 n
+                                  {first l}
+                                  {{list-ref {+ n -1}} {rest l}}}}}}}]}
+                 ;; Call list-ref on infinite list:
+                 {{list-ref 4} {nats-from 2}}}}}))
+        '6)
   (test (interp (parse '2) mt-env)
         (numV 2))
   (test/exn (interp (parse `x) mt-env)
