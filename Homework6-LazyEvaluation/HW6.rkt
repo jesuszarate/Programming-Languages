@@ -22,7 +22,14 @@
   [lamC (n : symbol)
         (body : ExprC)]
   [appC (fun : ExprC)
-        (arg : ExprC)])
+        (arg : ExprC)]
+  [if0C (test : ExprC)
+        (t : ExprC)
+        (f : ExprC)]
+  [consC (rhs : ExprC)
+         (lhs : ExprC)]
+  [firstC (e : ExprC)]
+  [restC (e : ExprC)])
 
 (define-type Binding
   [bind (name : symbol)
@@ -58,6 +65,19 @@
      (lamC (s-exp->symbol (first (s-exp->list 
                                   (second (s-exp->list s)))))
            (parse (third (s-exp->list s))))]
+    [(s-exp-match? '{if0 ANY ANY ANY} s)
+     (if0C (parse (second (s-exp->list s)))
+          (parse (third (s-exp->list s)))
+          (parse (fourth (s-exp->list s))))]
+    [(s-exp-match? '{cons ANY ANY} s)
+     (consC (parse (second (s-exp->list s)))
+            (parse (third (s-exp->list s))))]
+    [(s-exp-match? '{first ANY} s)
+     (firstC (parse (second (s-exp->list s))))]            
+
+    [(s-exp-match? '{rest ANY} s)
+     (restC (parse (second (s-exp->list s))))]            
+
     [(s-exp-match? '{ANY ANY} s)
      (appC (parse (first (s-exp->list s)))
            (parse (second (s-exp->list s))))]
@@ -97,6 +117,18 @@
                        (interp r env))]
     [lamC (n body)
           (closV n body env)]
+    
+    [if0C (test t f)
+          (type-case Value (interp test env)
+            [numV (n)
+                  (if (equal? n 0) (interp t env) (interp f env))]
+            [else (error 'interp "not a number")])]
+    [consC (lhs rhs)
+           (numV -1)]
+    [firstC (e)
+            (numV -1)]
+    [restC (e)
+            (numV -1)]
     [appC (fun arg) (type-case Value (interp fun env)
                       [closV (n body c-env)
                              (interp body
@@ -105,55 +137,74 @@
                                       c-env))]
                       [else (error 'interp "not a function")])]))
 
+(define (interp-expr (a : ExprC)) : s-expression   
+    (type-case Value (interp a mt-env)
+          [numV (n) (number->s-exp n)]
+          [closV (arg bod env) `function]))
+
 (module+ test
+
+  ;;Begin of lazy tests ____________________________________________________________
+
+  ;1
   (test (interp-expr (parse '10))
         '10)
+  ;2
   (test (interp-expr (parse '{+ 10 17}))
         '27)
+  ;3
   (test (interp-expr (parse '{* 10 7}))
         '70)
+  ;4
   (test (interp-expr (parse '{{lambda {x} {+ x 12}}
                               {+ 1 17}}))
         '30)
-  
+  ;5
   (test (interp-expr (parse '{let {[x 0]}
                                {let {[f {lambda {y} {+ x y}}]}
                                  {+ {f 1}
                                     {let {[x 3]}
                                       {f 2}}}}}))
         '3)
-  
+  ;6
   (test (interp-expr (parse '{if0 0 1 2}))
         '1)
+  ;7
   (test (interp-expr (parse '{if0 1 1 2}))
         '2)
-  
+  ;8
   (test (interp-expr (parse '{cons 1 2}))
         `cons)
+  ;9
   (test (interp-expr (parse '{first {cons 1 2}}))
         '1)
+  ;10
   (test (interp-expr (parse '{rest {cons 1 2}}))
         '2)
-  
+  ;11
   ;; Lazy evaluation:
   (test (interp-expr (parse '{{lambda {x} 0}
                               {+ 1 {lambda {y} y}}}))
         '0)
+  ;;12
   (test (interp-expr (parse '{let {[x {+ 1 {lambda {y} y}}]}
                                0}))
         '0)
+  ;;13
   (test (interp-expr (parse '{first {cons 3
                                           {+ 1 {lambda {y} y}}}}))
         '3)
+  ;;14
   (test (interp-expr (parse '{rest {cons {+ 1 {lambda {y} y}}
                                          4}}))
         '4)
+  ;;15
   (test (interp-expr (parse '{first {cons 5
                                           ;; Infinite loop:
                                           {{lambda {x} {x x}}
                                            {lambda {x} {x x}}}}}))
         '5)
-  
+  ;;16
   (test (interp-expr 
          (parse 
           '{let {[mkrec
@@ -177,7 +228,7 @@
                 ;; Call fib on 4:
                 {fib 4}}}))
         '5)
-
+  ;;17
   (test (interp-expr 
          (parse 
           '{let {[mkrec
@@ -205,6 +256,9 @@
                  ;; Call list-ref on infinite list:
                  {{list-ref 4} {nats-from 2}}}}}))
         '6)
+
+  ;;Begin of lazy tests ____________________________________________________________
+  
   (test (interp (parse '2) mt-env)
         (numV 2))
   (test/exn (interp (parse `x) mt-env)
