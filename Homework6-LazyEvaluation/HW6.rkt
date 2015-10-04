@@ -124,7 +124,7 @@
                   (if (equal? n 0) (interp t env) (interp f env))]
             [else (error 'interp "not a number")])]
     [consC (lhs rhs)
-           (numV -1)]
+           (closV 'n lhs env)]
     [firstC (e)
             (numV -1)]
     [restC (e)
