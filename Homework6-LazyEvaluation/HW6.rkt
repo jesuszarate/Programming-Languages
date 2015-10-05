@@ -5,7 +5,8 @@
   [numV (n : number)]
   [closV (arg : symbol)
          (body : ExprC)
-         (env : Env)])
+         (env : Env)]
+  [consV (lst : (listof ExprC))])
 
 (define-type Thunk
   [delay (body : ExprC)
@@ -124,11 +125,22 @@
                   (if (equal? n 0) (interp t env) (interp f env))]
             [else (error 'interp "not a number")])]
     [consC (lhs rhs)
-           (closV 'n lhs env)]
+           (consV (cons lhs (list rhs)))]
     [firstC (e)
-            (numV -1)]
+            (interp (first
+                     (type-case Value (interp e env)
+                       [consV (l) l]
+                       [else (error 'interp "not a cons")]))
+                    env)]
+    
     [restC (e)
-            (numV -1)]
+           (type-case Value (interp e env)
+             [consV (l)
+                    (if (= (length (rest l)) 1)                    
+                        (interp (first (rest l)) env)
+                        (consV (rest l)))]
+             [else (error 'interp "not a cons")])]
+               
     [appC (fun arg) (type-case Value (interp fun env)
                       [closV (n body c-env)
                              (interp body
@@ -138,14 +150,22 @@
                       [else (error 'interp "not a function")])]))
 
 (define (interp-expr (a : ExprC)) : s-expression   
-    (type-case Value (interp a mt-env)
-          [numV (n) (number->s-exp n)]
-          [closV (arg bod env) `function]))
+  (type-case Value (interp a mt-env)
+    [numV (n) (number->s-exp n)]
+    [closV (arg bod env) `function]
+    [consV (l) `cons]))
 
 (module+ test
 
+  ;(test (interp-expr (parse '{rest {cons 1 {list 1 2 3 4}}}))
+   ;     '2)
+  
   ;;Begin of lazy tests ____________________________________________________________
 
+  (test (interp {parse '{{lambda {x} 0}
+                         {1 2}}}
+                mt-env) (numV 0))
+  
   ;1
   (test (interp-expr (parse '10))
         '10)
