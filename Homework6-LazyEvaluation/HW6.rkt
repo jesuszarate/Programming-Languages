@@ -6,7 +6,9 @@
   [closV (arg : symbol)
          (body : ExprC)
          (env : Env)]
-  [consV (lst : (listof ExprC))])
+  [consV (f : Thunk)
+         (s : Thunk)])
+  ;[consV (lst : (listof ExprC))])
 
 (define-type Thunk
   [delay (body : ExprC)
