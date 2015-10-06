@@ -127,20 +127,18 @@
                   (if (equal? n 0) (interp t env) (interp f env))]
             [else (error 'interp "not a number")])]
     [consC (lhs rhs)
-           (consV (cons lhs (list rhs)))]
-    [firstC (e)
-            (interp (first
-                     (type-case Value (interp e env)
-                       [consV (l) l]
-                       [else (error 'interp "not a cons")]))
-                    env)]
+           (consV (delay lhs env (box (none)))
+                  (delay rhs env (box (none))))]
+    [firstC (e)            
+            (type-case Value (interp e env)
+              [consV (l r) (force l)]
+              [else (error 'interp "not a cons")])]
+              
     
     [restC (e)
            (type-case Value (interp e env)
-             [consV (l)
-                    (if (= (length (rest l)) 1)                    
-                        (interp (first (rest l)) env)
-                        (consV (rest l)))]
+             [consV (l r)                    
+                    (force r)]
              [else (error 'interp "not a cons")])]
                
     [appC (fun arg) (type-case Value (interp fun env)
@@ -155,16 +153,23 @@
   (type-case Value (interp a mt-env)
     [numV (n) (number->s-exp n)]
     [closV (arg bod env) `function]
-    [consV (l) `cons]))
+    [consV (l r) `cons]))
 
 (module+ test
 
-  
-  ;;14
-  ;(test (interp-expr (parse '{first {cons {+ 1 {lambda {y} y}}
-   ;                                      4}}))
-    ;    '4) 
-  
+  (test (interp-expr (parse '{lambda {x} {+ x 12}}))
+        `function)
+ 
+  (test/exn (interp-expr (parse '{if0 {lambda {x} {+ x 12}}
+                                      1 2}))
+        "not a number")
+
+  (test/exn (interp-expr (parse '{first {lambda {y} y}}))
+                                          
+        "not a cons")
+  (test/exn (interp-expr (parse '{rest {lambda {y} y}}))                                          
+        "not a cons") 
+    
   ;;Begin of lazy tests ____________________________________________________________
 
   (test (interp {parse '{{lambda {x} 0}
