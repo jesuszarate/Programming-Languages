@@ -157,8 +157,11 @@
 
 (module+ test
 
-  ;(test (interp-expr (parse '{rest {cons 1 {list 1 2 3 4}}}))
-   ;     '2)
+  
+  ;;14
+  ;(test (interp-expr (parse '{first {cons {+ 1 {lambda {y} y}}
+   ;                                      4}}))
+    ;    '4) 
   
   ;;Begin of lazy tests ____________________________________________________________
 
