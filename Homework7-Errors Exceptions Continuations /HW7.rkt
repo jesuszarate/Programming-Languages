@@ -21,7 +21,10 @@
   [appC (fun : ExprC)
         (args : (listof ExprC))]
   [let/ccC (n : symbol)
-           (body : ExprC)])
+           (body : ExprC)]
+  [if0C (test : ExprC)
+        (t : ExprC)
+        (f : ExprC)])
 
 (define-type Binding
   [bind (name : symbol)
@@ -79,6 +82,10 @@
     [(s-exp-match? '{let/cc SYMBOL ANY} s)
      (let/ccC (s-exp->symbol (second (s-exp->list s)))
               (parse (third (s-exp->list s))))]
+    [(s-exp-match? '{if0 ANY ANY ANY} s)
+     (if0C (parse (second (s-exp->list s)))
+          (parse (third (s-exp->list s)))
+          (parse (fourth (s-exp->list s))))]
     [(s-exp-match? '{ANY ANY} s)
      (appC (parse (first (s-exp->list s)))
            (map parse (rest (s-exp->list s))))]
