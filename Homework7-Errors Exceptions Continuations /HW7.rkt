@@ -25,8 +25,8 @@
   [if0C (test : ExprC)
         (t : ExprC)
         (f : ExprC)]
-  [neg (e : ExprC)]
-  [avg (first : ExprC)
+  [negC (e : ExprC)]
+  [avgC (first : ExprC)
        (second : ExprC)
        (third : ExprC)])
 
@@ -90,6 +90,15 @@
      (if0C (parse (second (s-exp->list s)))
            (parse (third (s-exp->list s)))
            (parse (fourth (s-exp->list s))))]
+    
+    [(s-exp-match? '{neg ANY} s)
+     (negC (parse (second (s-exp->list s))))]
+    
+    [(s-exp-match? '{avg ANY ANY ANY} s)
+     (avgC (parse (second (s-exp->list s)))
+           (parse (third (s-exp->list s)))
+           (parse (fourth (s-exp->list s))))]
+                   
     [(s-exp-match? '{ANY ANY} s)
      (appC (parse (first (s-exp->list s)))
            (map parse (rest (s-exp->list s))))]
@@ -138,6 +147,8 @@
             [numV (n)
                   (if (equal? n 0) (interp t env k) (interp f env k))]
             [else (error 'interp "not a number")])]
+    [negC (e) (numV 1)] ; Implement it without using the add
+    [avgC (f s t) (numV 1)]
     [let/ccC (n body)
              (interp body
                      (extend-env (bind n (contV k))
@@ -178,6 +189,25 @@
     [contV (k) `continuation]))
 
 (module+ test
+
+  (test (interp-expr (parse '{neg 2}))
+        '-2)
+  (test (interp-expr (parse '{avg 0 6 6}))
+        '4)
+  (test (interp-expr (parse '{let/cc k {neg {k 3}}}))
+        '3)
+  (test (interp-expr (parse '{let/cc k {avg 0 {k 3} 0}}))
+        '3)
+  (test (interp-expr (parse '{let/cc k {avg {k 2} {k 3} 0}}))
+        '2)
+  (test (interp-expr (parse '{if0 1 2 3}))
+        '3)
+  (test (interp-expr (parse '{if0 0 2 3}))
+        '2)
+  (test (interp-expr (parse '{let/cc k {if0 {k 9} 2 3}}))
+        '9)
+  ;;________________________________________________________
+  
   (test/exn (interp-expr (parse '{if0 {lambda {x} {+ x 12}}
                                       1 2}))
             "not a number")
