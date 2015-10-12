@@ -84,8 +84,8 @@
               (parse (third (s-exp->list s))))]
     [(s-exp-match? '{if0 ANY ANY ANY} s)
      (if0C (parse (second (s-exp->list s)))
-          (parse (third (s-exp->list s)))
-          (parse (fourth (s-exp->list s))))]
+           (parse (third (s-exp->list s)))
+           (parse (fourth (s-exp->list s))))]
     [(s-exp-match? '{ANY ANY} s)
      (appC (parse (first (s-exp->list s)))
            (map parse (rest (s-exp->list s))))]
@@ -129,6 +129,11 @@
           (continue k (closV ns body env))]
     [appC (fun args) (interp fun env
                              (appArgK (first args) env k))]
+    [if0C (test t f)
+          (type-case Value (interp test env k)
+            [numV (n)
+                  (if (equal? n 0) (interp t env k) (interp f env k))]
+            [else (error 'interp "not a number")])]
     [let/ccC (n body)
              (interp body
                      (extend-env (bind n (contV k))
@@ -144,8 +149,8 @@
     [doAddK (v-l next-k)
             (continue next-k (num+ v-l v))]
     [multSecondK (r env next-k)
-                (interp r env
-                        (doMultK v next-k))]
+                 (interp r env
+                         (doMultK v next-k))]
     [doMultK (v-l next-k)
              (continue next-k (num* v-l v))]
     [appArgK (a env next-k)
@@ -162,7 +167,21 @@
               [contV (k-v) (continue k-v v)]
               [else (error 'interp "not a function")])]))
 
+(define (interp-expr (a : ExprC)) : s-expression   
+  (type-case Value (interp a mt-env (doneK))
+    [numV (n) (number->s-exp n)]
+    [closV (arg bod env) `function]
+    [contV (k) `continuation]))
+
 (module+ test
+  (test/exn (interp-expr (parse '{if0 {lambda {x} {+ x 12}}
+                                      1 2}))
+            "not a number")
+  (test (interp-expr (parse '{if0 0 1 2}))
+        '1)
+  
+  (test (interp-expr (parse '{if0 1 1 2}))
+        '2)
   (test (interp (parse '2) mt-env (doneK))
         (numV 2))
   (test/exn (interp (parse `x) mt-env (doneK))
@@ -204,7 +223,7 @@
                 mt-env
                 (doneK))
         (numV 16))
-
+  
   (test (interp (parse '{let/cc k {+ 1 {k 0}}})
                 mt-env
                 (doneK))
@@ -214,7 +233,7 @@
                 mt-env
                 (doneK))
         (numV 10))
-
+  
   (test/exn (interp (parse '{1 2}) mt-env (doneK))
             "not a function")
   (test/exn (interp (parse '{+ 1 {lambda {x} x}}) mt-env (doneK))
@@ -228,7 +247,7 @@
   ;; Eager:
   (test/exn (interp (parse '{{lambda {x} 0} {1 2}}) mt-env (doneK))
             "not a function")
-
+  
   (test (continue (doneK) (numV 5))
         (numV 5))
   (test (continue (addSecondK (numC 6) mt-env (doneK)) (numV 5))
@@ -247,10 +266,10 @@
 ;; num+ and num* ----------------------------------------
 (define (num-op [op : (number number -> number)] [l : Value] [r : Value]) : Value
   (cond
-   [(and (numV? l) (numV? r))
-    (numV (op (numV-n l) (numV-n r)))]
-   [else
-    (error 'interp "not a number")]))
+    [(and (numV? l) (numV? r))
+     (numV (op (numV-n l) (numV-n r)))]
+    [else
+     (error 'interp "not a number")]))
 (define (num+ [l : Value] [r : Value]) : Value
   (num-op + l r))
 (define (num* [l : Value] [r : Value]) : Value
@@ -265,11 +284,11 @@
 ;; lookup ----------------------------------------
 (define (lookup [n : symbol] [env : Env]) : Value
   (cond
-   [(empty? env) (error 'lookup "free variable")]
-   [else (cond
-          [(symbol=? n (bind-name (first env)))
-           (bind-val (first env))]
-          [else (lookup n (rest env))])]))
+    [(empty? env) (error 'lookup "free variable")]
+    [else (cond
+            [(symbol=? n (bind-name (first env)))
+             (bind-val (first env))]
+            [else (lookup n (rest env))])]))
 
 (module+ test
   (test/exn (lookup 'x mt-env)
@@ -284,4 +303,3 @@
                     (bind 'x (numV 9))
                     (extend-env (bind 'y (numV 8)) mt-env)))
         (numV 8)))
-  
