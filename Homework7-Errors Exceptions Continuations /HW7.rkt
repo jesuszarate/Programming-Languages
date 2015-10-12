@@ -24,7 +24,11 @@
            (body : ExprC)]
   [if0C (test : ExprC)
         (t : ExprC)
-        (f : ExprC)])
+        (f : ExprC)]
+  [neg (e : ExprC)]
+  [avg (first : ExprC)
+       (second : ExprC)
+       (third : ExprC)])
 
 (define-type Binding
   [bind (name : symbol)
