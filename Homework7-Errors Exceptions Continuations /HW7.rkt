@@ -49,9 +49,14 @@
           (k : Cont)]
   [multSecondK (r : ExprC)
                (e : Env)
-               (k : Cont)]
+               (k : Cont)]  
   [doMultK (v : Value)
            (k : Cont)]
+  [negSecondK (r : ExprC)
+              (e : Env)
+              (k : Cont)]
+  [doNegK (v : Value)
+          (k  : Cont)]
   [appArgK (a : ExprC)
            (env : Env)
            (k : Cont)]
@@ -147,7 +152,8 @@
             [numV (n)
                   (if (equal? n 0) (interp t env k) (interp f env k))]
             [else (error 'interp "not a number")])]
-    [negC (e) (numV 1)] ; Implement it without using the add
+    [negC (e) (interp e env
+                      (negSecondK e env k))] ; Implement it without using the add
     [avgC (f s t) (numV 1)]
     [let/ccC (n body)
              (interp body
@@ -168,6 +174,11 @@
                          (doMultK v next-k))]
     [doMultK (v-l next-k)
              (continue next-k (num* v-l v))]
+    [negSecondK (r env next-k)
+                (interp r env
+                        (doNegK v next-k))]
+    [doNegK (v-l next-k)
+            (continue next-k (num* v-l v))]
     [appArgK (a env next-k)
              (interp a env
                      (doAppK v next-k))]
