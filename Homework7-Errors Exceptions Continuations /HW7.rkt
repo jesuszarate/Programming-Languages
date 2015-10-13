@@ -147,13 +147,14 @@
           (continue k (closV ns body env))]
     [appC (fun args) (interp fun env
                              (appArgK (first args) env k))]
-    [if0C (test t f)
+    [if0C (test t f) ; Make this use a continuation instead of interping twice
           (type-case Value (interp test env k)
             [numV (n)
                   (if (equal? n 0) (interp t env k) (interp f env k))]
             [else (error 'interp "not a number")])]
-    [negC (e) (interp e env
-                      (negSecondK e env k))] ; Implement it without using the add
+    [negC (e) 
+          (interp e env
+                  (negSecondK e env k))] ; Implement it without using the add
     [avgC (f s t) (numV 1)]
     [let/ccC (n body)
              (interp body
