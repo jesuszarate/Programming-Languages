@@ -184,9 +184,9 @@
              (continue next-k (num* v-l v))]
     [negSecondK (r env next-k)
                 (interp r env
-                        (doNegK v next-k))]
+                        (doNegK next-k))]
     [doNegK (next-k)
-            (continue next-k (num* v-l v))]
+            (continue next-k (num* (numV -1) v))]
     [if0SecondK (t f env next-k)
                 (type-case Value v
                   [numV (n) (if (equal? n 0)
@@ -218,6 +218,23 @@
 
 (module+ test
 
+  (test (interp-expr (parse '{{lambda {x y} {+ y {neg x}}} 10 12}))
+        '2)
+  (test (interp-expr (parse '{lambda {} 12}))
+        `function)
+  (test (interp-expr (parse '{lambda {x} {lambda {} x}}))
+        `function)
+  (test (interp-expr (parse '{{{lambda {x} {lambda {} x}} 13}}))
+        '13)
+
+  (test (interp-expr (parse '{let/cc esc {{lambda {x y} x} 1 {esc 3}}}))
+        '3)
+  (test (interp-expr (parse '{{let/cc esc {{lambda {x y} {lambda {z} {+ z y}}}
+                                           1 
+                                           {let/cc k {esc k}}}}
+                              10}))
+        '20)
+  ;;_______________________________________________________
   (test (interp-expr (parse '{neg 2}))
         '-2)
   (test (interp-expr (parse '{avg 0 6 6}))
