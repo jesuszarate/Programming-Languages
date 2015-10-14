@@ -55,8 +55,7 @@
   [negSecondK (r : ExprC)
               (e : Env)
               (k : Cont)]
-  [doNegK (v : Value)
-          (k  : Cont)]
+  [doNegK (k  : Cont)]          
   [if0SecondK (t : ExprC)
               (f : ExprC)
               (e : Env)
@@ -154,15 +153,15 @@
     [appC (fun args) (interp fun env
                              (appArgK (first args) env k))]
     [if0C (test t f) ; Make this use a continuation instead of interping twice
-
-          (interp test env (if0))]
+          (interp test env
+                  (if0SecondK t f env k))]
           ;(type-case Value (interp test env k)
            ; [numV (n)
             ;      (if (equal? n 0) (interp t env k) (interp f env k))]
             ;[else (error 'interp "not a number")])]
-    [negC (e) 
+    [negC (e)
           (interp e env
-                  (negSecondK e env k))] ; Implement it without using the add
+                  (doNegK k))] ; Implement it without using the add
     [avgC (f s t) (numV 1)]
     [let/ccC (n body)
              (interp body
@@ -186,11 +185,15 @@
     [negSecondK (r env next-k)
                 (interp r env
                         (doNegK v next-k))]
-    [doNegK (v-l next-k)
+    [doNegK (next-k)
             (continue next-k (num* v-l v))]
-    [if0SecondK (r env next-k)
-                (interp r env
-                        (doIf0K v next-k))]
+    [if0SecondK (t f env next-k)
+                (type-case Value v
+                  [numV (n) (if (equal? n 0)
+                            (interp t env next-k)
+                            (interp f env next-k))]
+                  [else (error 'continue "not a number")])]
+                
     [doIf0K (v-l next-k)
             (continue next-k (num* v-l v))]
     [appArgK (a env next-k)
