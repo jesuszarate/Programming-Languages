@@ -16,7 +16,7 @@
          (r : ExprC)]
   [multC (l : ExprC)
          (r : ExprC)]
-  [lamC (ns : (listof symbol))
+  [lamC (ns : (listof symbol)) ; Lambdas must be able to take 0 or more args
         (body : ExprC)]
   [appC (fun : ExprC)
         (args : (listof ExprC))]
