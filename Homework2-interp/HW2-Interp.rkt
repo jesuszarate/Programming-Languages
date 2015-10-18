@@ -223,18 +223,7 @@
     [idC (s) (lookup s env)]
     [plusC (l r) (+ (interp l env fds) (interp r env fds))]
     [multC (l r) (* (interp l env fds) (interp r env fds))]
-    [maxC (l r) (if(> (interp l env fds) (interp r env fds)) (interp l env fds) (interp r env fds))]
-    
-;    [appC (s args) (local [(define fd (get-fundef s fds))]                     
-;                     (interp (fdC-body fd)
-;                             (if(contain-duplicates? (fdC-arg fd)) (error 'interp "bad syntax")
-;                                (if (= (length args) (length (fdC-arg fd)))
-;                                    (foldl (lambda (element env-e)(append element env-e)) mt-env
-;                                           (map2 (lambda (a d)                                            
-;                                                   (extend-env (bind d (interp a env fds)) mt-env))
-;                                                 args (fdC-arg fd)))                                    
-;                                    (error 'interp "wrong arity")))a
-;                             fds))]
+    [maxC (l r) (if(> (interp l env fds) (interp r env fds)) (interp l env fds) (interp r env fds))]   
     
     [appC (s args) (local [(define fd (get-fundef s fds))]
                                                      (interp (fdC-body fd)
