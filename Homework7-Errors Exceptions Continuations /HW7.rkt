@@ -154,17 +154,17 @@
           (continue k (closV ns body env))]
     [appC (fun args) (interp fun env
                              (appArgK (first args) env k))]
-    [if0C (test t f) ; Make this use a continuation instead of interping twice
+    [if0C (test t f) 
           (interp test env
-                  (if0SecondK t f env k))]
-          ;(type-case Value (interp test env k)
-           ; [numV (n)
-            ;      (if (equal? n 0) (interp t env k) (interp f env k))]
-            ;[else (error 'interp "not a number")])]
+                  (if0SecondK t f env k))]         
     [negC (e)
           (interp e env
                   (doNegK k))] ; Implement it without using the add
-    [avgC (f s t) (numV 1)]
+    [avgC (f s t) (num/
+                   (num+
+                    (num+ (interp f env k)
+                          (interp s env k))
+                    (interp t env k)) (numV 3))]
     [let/ccC (n body)
              (interp body
                      (extend-env (bind n (contV k))
@@ -355,6 +355,8 @@
   (num-op + l r))
 (define (num* [l : Value] [r : Value]) : Value
   (num-op * l r))
+(define (num/ [l : Value] [r : Value]) : Value
+  (num-op / l r))
 
 (module+ test
   (test (num+ (numV 1) (numV 2))
