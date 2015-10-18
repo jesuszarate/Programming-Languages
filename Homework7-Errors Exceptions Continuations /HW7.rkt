@@ -91,7 +91,7 @@
        (appC (lamC (list (s-exp->symbol (first bs)))
                    (parse (third (s-exp->list s))))
              (list (parse (second bs)))))]
-    [(s-exp-match? '{lambda {SYMBOL} ANY} s)
+    [(s-exp-match? '{lambda {SYMBOL} ANY ...} s)
      (lamC (map s-exp->symbol (s-exp->list 
                                (second (s-exp->list s))))
            (parse (third (s-exp->list s))))]
@@ -111,7 +111,7 @@
            (parse (third (s-exp->list s)))
            (parse (fourth (s-exp->list s))))]
                    
-    [(s-exp-match? '{ANY ANY} s)
+    [(s-exp-match? '{ANY ANY ...} s)
      (appC (parse (first (s-exp->list s)))
            (map parse (rest (s-exp->list s))))]
     [else (error 'parse "invalid input")]))
