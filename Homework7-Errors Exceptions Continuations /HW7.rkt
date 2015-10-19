@@ -57,7 +57,16 @@
   [negSecondK (r : ExprC)
               (e : Env)
               (k : Cont)]
-  [doNegK (k  : Cont)]          
+  [doNegK (k  : Cont)]
+  [avgSecondK (s : ExprC)
+              (t : ExprC)
+              (e : Env)
+              (k : Cont)]
+  [avgThirdK (t : ExprC)              
+             (e : Env)
+             (k : Cont)]
+  [doAvgK (v : Value)
+          (k : Cont)]
   [if0SecondK (t : ExprC)
               (f : ExprC)
               (e : Env)
@@ -160,11 +169,14 @@
     [negC (e)
           (interp e env
                   (doNegK k))] ; Implement it without using the add
-    [avgC (f s t) (num/
-                   (num+
-                    (num+ (interp f env k)
-                          (interp s env k))
-                    (interp t env k)) (numV 3))]
+    [avgC (f s t)
+          (interp f env
+                  (avgSecondK s t env k))]
+    
+    ;(num+
+    ;(num+ (interp f env k)
+    ;     (interp s env k))
+    ;(interp t env k)) (numV 3))]
     [let/ccC (n body)
              (interp body
                      (extend-env (bind n (contV k))
@@ -189,6 +201,14 @@
                         (doNegK next-k))]
     [doNegK (next-k)
             (continue next-k (num* (numV -1) v))]
+    [avgSecondK (s t env next-k)
+                (interp s env
+                        (avgThirdK t env next-k))]
+    [avgThirdK (t env next-k)
+                (interp t env
+                        (doAvgK v next-k))]
+    [doAvgK (v-l next-k)
+            (continue next-k (num/ (num+ v-l v) (numV 3)))]
     [if0SecondK (t f env next-k)
                 (type-case Value v
                   [numV (n) (if (equal? n 0)
@@ -219,7 +239,7 @@
     [contV (k) `continuation]))
 
 (module+ test
-
+#|
   (test (interp-expr (parse '{{lambda {x y} {+ y {neg x}}} 10 12}))
         '2)
   (test (interp-expr (parse '{lambda {} 12}))
@@ -236,6 +256,7 @@
                                            {let/cc k {esc k}}}}
                               10}))
         '20)
+|#
   ;;_______________________________________________________
   (test (interp-expr (parse '{neg 2}))
         '-2)
