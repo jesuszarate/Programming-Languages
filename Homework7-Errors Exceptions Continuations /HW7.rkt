@@ -62,10 +62,12 @@
               (t : ExprC)
               (e : Env)
               (k : Cont)]
-  [avgThirdK (t : ExprC)              
+  [avgThirdK (v : Value)
+             (t : ExprC)             
              (e : Env)
              (k : Cont)]
-  [doAvgK (v : Value)
+  [doAvgK (v-f : Value)
+          (v-s : Value)
           (k : Cont)]
   [if0SecondK (t : ExprC)
               (f : ExprC)
@@ -100,7 +102,7 @@
        (appC (lamC (list (s-exp->symbol (first bs)))
                    (parse (third (s-exp->list s))))
              (list (parse (second bs)))))]
-    [(s-exp-match? '{lambda {SYMBOL} ANY ...} s)
+    [(s-exp-match? '{lambda {SYMBOL ...} ANY ...} s)
      (lamC (map s-exp->symbol (s-exp->list 
                                (second (s-exp->list s))))
            (parse (third (s-exp->list s))))]
@@ -120,7 +122,7 @@
            (parse (third (s-exp->list s)))
            (parse (fourth (s-exp->list s))))]
                    
-    [(s-exp-match? '{ANY ANY ...} s)
+    [(s-exp-match? '{ANY ...} s)
      (appC (parse (first (s-exp->list s)))
            (map parse (rest (s-exp->list s))))]
     [else (error 'parse "invalid input")]))
@@ -171,12 +173,7 @@
                   (doNegK k))] ; Implement it without using the add
     [avgC (f s t)
           (interp f env
-                  (avgSecondK s t env k))]
-    
-    ;(num+
-    ;(num+ (interp f env k)
-    ;     (interp s env k))
-    ;(interp t env k)) (numV 3))]
+                  (avgSecondK s t env k))]  
     [let/ccC (n body)
              (interp body
                      (extend-env (bind n (contV k))
@@ -209,8 +206,8 @@
                         (doAvgK v-f v next-k))]
     [doAvgK (v-f v-s next-k)
             (continue next-k (num/
-                               (num+ v-l v)                               
-                               (numV 3)))]
+                              (num+ (num+ v-f v-s) v)                                     
+                              (numV 3)))]
     [if0SecondK (t f env next-k)
                 (type-case Value v
                   [numV (n) (if (equal? n 0)
@@ -241,11 +238,13 @@
     [contV (k) `continuation]))
 
 (module+ test
+;  (test (interp (parse '{{lambda {x} {+ x x}} 8})
+;                mt-env
+;                (doneK))
+;        (numV 16))
   
-  (test (interp-expr (parse '{avg 6 0 6}))
-        '4)
   ;;________________________________________________________________
-#|
+;#|
   (test (interp-expr (parse '{{lambda {x y} {+ y {neg x}}} 10 12}))
         '2)
   (test (interp-expr (parse '{lambda {} 12}))
@@ -262,11 +261,13 @@
                                            {let/cc k {esc k}}}}
                               10}))
         '20)
-|#
+;|#
   ;;_______________________________________________________
   (test (interp-expr (parse '{neg 2}))
         '-2)
   (test (interp-expr (parse '{avg 0 6 6}))
+        '4)
+  (test (interp-expr (parse '{avg 6 0 6}))
         '4)
   (test (interp-expr (parse '{let/cc k {neg {k 3}}}))
         '3)
