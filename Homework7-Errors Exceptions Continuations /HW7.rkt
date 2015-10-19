@@ -127,7 +127,7 @@
            (parse (third (s-exp->list s)))
            (parse (fourth (s-exp->list s))))]
                    
-    [(s-exp-match? '{ANY ...} s)
+    [(s-exp-match? '{ANY ANY ...} s)
      (appC (parse (first (s-exp->list s)))
            (map parse (rest (s-exp->list s))))]
     [else (error 'parse "invalid input")]))
@@ -227,13 +227,26 @@
              (interp a env
                      (doAppK (list v) next-k))]
     [appArgsK (args vals env next-k)
-              (if (= (length args) 1)                  
-                  (interp (first args) env (doAppK (append vals (list v)) next-k))
-                  ;(interp (first args) env next-k)
-                  ; (interp (first args) env (doAppK v next-k))]
-                  
-                  (interp (first args) env
-                          (appArgsK (rest args) (append vals (list v)) env next-k)))]
+              (cond
+                [(empty? args)
+                 (type-case Value v
+                   [closV (ns body c-env)
+                          (interp body
+                                  (extend-env*
+                                   (map2 bind ns vals)
+                                   c-env)
+                                  next-k)]
+                   [contV (k-v) (continue k-v v)]
+                   [else (error 'interp "not a function")])]
+                 ;(continue (doAppK (list v) next-k) v)]
+                 ;(continue next-k v)]
+                 ;(interp empty env (appArgsK empty))]
+                [else (if (= (length args) 1)                  
+                          (interp (first args) env (doAppK (append vals (list v)) next-k))
+                          ;(interp (first args) env next-k)
+                          ; (interp (first args) env (doAppK v next-k))]                  
+                          (interp (first args) env
+                                  (appArgsK (rest args) (append vals (list v)) env next-k)))])]
     [doAppK (v-f next-k)
             (type-case Value (first v-f)
               [closV (ns body c-env)
