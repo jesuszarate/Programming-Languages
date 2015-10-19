@@ -203,12 +203,14 @@
             (continue next-k (num* (numV -1) v))]
     [avgSecondK (s t env next-k)
                 (interp s env
-                        (avgThirdK t env next-k))]
-    [avgThirdK (t env next-k)
+                        (avgThirdK v t env next-k))]
+    [avgThirdK (v-f t env next-k)
                 (interp t env
-                        (doAvgK v next-k))]
-    [doAvgK (v-l next-k)
-            (continue next-k (num/ (num+ v-l v) (numV 3)))]
+                        (doAvgK v-f v next-k))]
+    [doAvgK (v-f v-s next-k)
+            (continue next-k (num/
+                               (num+ v-l v)                               
+                               (numV 3)))]
     [if0SecondK (t f env next-k)
                 (type-case Value v
                   [numV (n) (if (equal? n 0)
@@ -239,6 +241,10 @@
     [contV (k) `continuation]))
 
 (module+ test
+  
+  (test (interp-expr (parse '{avg 6 0 6}))
+        '4)
+  ;;________________________________________________________________
 #|
   (test (interp-expr (parse '{{lambda {x y} {+ y {neg x}}} 10 12}))
         '2)
