@@ -8,6 +8,7 @@
          (body : ExprC)
          (env : Env)]
   [contV (k : Cont)])
+  ;[argsV (args : (listof Value))])
 
 (define-type ExprC
   [numC (n : number)]
@@ -78,7 +79,11 @@
   [appArgK (a : ExprC)
            (env : Env)
            (k : Cont)]
-  [doAppK (f : Value)
+  [appArgsK (a : (listof ExprC))
+            (vals : (listof Value))
+            (env : Env)
+            (k : Cont)]
+  [doAppK (f : (listof Value))
           (k : Cont)])
 
 (module+ test
@@ -164,7 +169,8 @@
     [lamC (ns body)
           (continue k (closV ns body env))]
     [appC (fun args) (interp fun env
-                             (appArgK (first args) env k))]
+                             ;(appArgsK (first args) env k))]
+                             (appArgsK args empty env k))]
     [if0C (test t f) 
           (interp test env
                   (if0SecondK t f env k))]         
@@ -219,17 +225,35 @@
             (continue next-k (num* v-l v))]
     [appArgK (a env next-k)
              (interp a env
-                     (doAppK v next-k))]
+                     (doAppK (list v) next-k))]
+    [appArgsK (args vals env next-k)
+              (if (= (length args) 1)                  
+                  (interp (first args) env (doAppK (append vals (list v)) next-k))
+                  ;(interp (first args) env next-k)
+                  ; (interp (first args) env (doAppK v next-k))]
+                  
+                  (interp (first args) env
+                          (appArgsK (rest args) (append vals (list v)) env next-k)))]
     [doAppK (v-f next-k)
-            (type-case Value v-f
+            (type-case Value (first v-f)
               [closV (ns body c-env)
                      (interp body
                              (extend-env*
-                              (map2 bind ns (list v))
+                              (map2 bind ns (rest (append v-f (list v))))
                               c-env)
                              next-k)]
               [contV (k-v) (continue k-v v)]
               [else (error 'interp "not a function")])]))
+;    [doAppK (v-f next-k)
+;            (type-case Value v-f
+;              [closV (ns body c-env)
+;                     (interp body
+;                             (extend-env*
+;                              (map2 bind ns (list v))
+;                              c-env)
+;                             next-k)]
+;              [contV (k-v) (continue k-v v)]
+;              [else (error 'interp "not a function")])]))
 
 (define (interp-expr (a : ExprC)) : s-expression   
   (type-case Value (interp a mt-env (doneK))
@@ -369,8 +393,9 @@
         (numV 35))
   (test (continue (appArgK (numC 5) mt-env (doneK)) (closV (list 'x) (idC 'x) mt-env))
         (numV 5))
-  (test (continue (doAppK (closV (list 'x) (idC 'x) mt-env) (doneK)) (numV 8))
-        (numV 8)))
+  ;(test (continue (doAppK (closV (list 'x) (idC 'x) mt-env) (doneK)) (numV 8))
+  ;(numV 8))
+)
 
 ;; num+ and num* ----------------------------------------
 (define (num-op [op : (number number -> number)] [l : Value] [r : Value]) : Value
