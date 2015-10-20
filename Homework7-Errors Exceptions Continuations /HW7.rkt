@@ -16,8 +16,6 @@
          (r : ExprC)]
   [multC (l : ExprC)
          (r : ExprC)]
-  ;[lamC (ns : (listof symbol)) ; Lambdas must be able to take 0 or more args
-  ;      (body : ExprC)]
   [lamC (ns : (listof symbol)) ; Lambdas must be able to take 0 or more args
         (body : ExprC)]
   [appC (fun : ExprC)
@@ -53,10 +51,7 @@
                (e : Env)
                (k : Cont)]  
   [doMultK (v : Value)
-           (k : Cont)]
-  ;[negSecondK (r : ExprC)
-   ;           (e : Env)
-    ;          (k : Cont)]
+           (k : Cont)]  
   [doNegK (k  : Cont)]
   [avgSecondK (s : ExprC)
               (t : ExprC)
@@ -73,8 +68,6 @@
               (f : ExprC)
               (e : Env)
               (k : Cont)]
-  ;[doIf0K (v : Value)
-   ;       (k : Cont)]
   [appArgK (a : ExprC)
            (env : Env)
            (k : Cont)]
@@ -168,7 +161,6 @@
     [lamC (ns body)
           (continue k (closV ns body env))]
     [appC (fun args) (interp fun env
-                             ;(appArgsK (first args) env k))]
                              (appArgsK args empty env k))]
     [if0C (test t f) 
           (interp test env
@@ -198,9 +190,6 @@
                          (doMultK v next-k))]
     [doMultK (v-l next-k)
              (continue next-k (num* v-l v))]
-    ;[negSecondK (r env next-k)
-     ;           (interp r env
-      ;                  (doNegK next-k))]
     [doNegK (next-k)
             (continue next-k (num* (numV -1) v))]
     [avgSecondK (s t env next-k)
@@ -219,9 +208,7 @@
                             (interp t env next-k)
                             (interp f env next-k))]
                   [else (error 'continue "not a number")])]
-                
-    ;[doIf0K (v-l next-k)
-     ;       (continue next-k (num* v-l v))]
+                    
     [appArgK (a env next-k)
              (interp a env
                      (doAppK (list v) next-k))]
@@ -234,16 +221,10 @@
                                   (extend-env*
                                    (map2 bind ns vals)
                                    c-env)
-                                  next-k)]
-                   ;[contV (k-v) (continue k-v v)]
-                   [else (error 'interp "not a function")])]
-                 ;(continue (doAppK (list v) next-k) v)]
-                 ;(continue next-k v)]
-                 ;(interp empty env (appArgsK empty))]
+                                  next-k)]                   
+                   [else (error 'interp "not a function")])]                 
                 [else (if (= (length args) 1)                  
-                          (interp (first args) env (doAppK (append vals (list v)) next-k))
-                          ;(interp (first args) env next-k)
-                          ; (interp (first args) env (doAppK v next-k))]                  
+                          (interp (first args) env (doAppK (append vals (list v)) next-k))                          
                           (interp (first args) env
                                   (appArgsK (rest args) (append vals (list v)) env next-k)))])]
     [doAppK (v-f next-k)
@@ -256,16 +237,6 @@
                              next-k)]
               [contV (k-v) (continue k-v v)]
               [else (error 'interp "not a function")])]))
-;    [doAppK (v-f next-k)
-;            (type-case Value v-f
-;              [closV (ns body c-env)
-;                     (interp body
-;                             (extend-env*
-;                              (map2 bind ns (list v))
-;                              c-env)
-;                             next-k)]
-;              [contV (k-v) (continue k-v v)]
-;              [else (error 'interp "not a function")])]))
 
 (define (interp-expr (a : ExprC)) : s-expression   
   (type-case Value (interp a mt-env (doneK))
