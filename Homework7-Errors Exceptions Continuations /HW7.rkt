@@ -55,9 +55,9 @@
                (k : Cont)]  
   [doMultK (v : Value)
            (k : Cont)]
-  [negSecondK (r : ExprC)
-              (e : Env)
-              (k : Cont)]
+  ;[negSecondK (r : ExprC)
+   ;           (e : Env)
+    ;          (k : Cont)]
   [doNegK (k  : Cont)]
   [avgSecondK (s : ExprC)
               (t : ExprC)
@@ -74,8 +74,8 @@
               (f : ExprC)
               (e : Env)
               (k : Cont)]
-  [doIf0K (v : Value)
-          (k : Cont)]
+  ;[doIf0K (v : Value)
+   ;       (k : Cont)]
   [appArgK (a : ExprC)
            (env : Env)
            (k : Cont)]
@@ -199,9 +199,9 @@
                          (doMultK v next-k))]
     [doMultK (v-l next-k)
              (continue next-k (num* v-l v))]
-    [negSecondK (r env next-k)
-                (interp r env
-                        (doNegK next-k))]
+    ;[negSecondK (r env next-k)
+     ;           (interp r env
+      ;                  (doNegK next-k))]
     [doNegK (next-k)
             (continue next-k (num* (numV -1) v))]
     [avgSecondK (s t env next-k)
@@ -221,8 +221,8 @@
                             (interp f env next-k))]
                   [else (error 'continue "not a number")])]
                 
-    [doIf0K (v-l next-k)
-            (continue next-k (num* v-l v))]
+    ;[doIf0K (v-l next-k)
+     ;       (continue next-k (num* v-l v))]
     [appArgK (a env next-k)
              (interp a env
                      (doAppK (list v) next-k))]
@@ -236,7 +236,7 @@
                                    (map2 bind ns vals)
                                    c-env)
                                   next-k)]
-                   [contV (k-v) (continue k-v v)]
+                   ;[contV (k-v) (continue k-v v)]
                    [else (error 'interp "not a function")])]
                  ;(continue (doAppK (list v) next-k) v)]
                  ;(continue next-k v)]
