@@ -7,8 +7,7 @@
   [closV (args : (listof symbol))
          (body : ExprC)
          (env : Env)]
-  [contV (k : Cont)])
-  ;[argsV (args : (listof Value))])
+  [contV (k : Cont)])  
 
 (define-type ExprC
   [numC (n : number)]
@@ -274,12 +273,7 @@
     [closV (arg bod env) `function]
     [contV (k) `continuation]))
 
-(module+ test
-;  (test (interp (parse '{{lambda {x} {+ x x}} 8})
-;                mt-env
-;                (doneK))
-;        (numV 16))
-  
+(module+ test 
   ;;________________________________________________________________
 ;#|
   (test (interp-expr (parse '{{lambda {x y} {+ y {neg x}}} 10 12}))
@@ -290,6 +284,8 @@
         `function)
   (test (interp-expr (parse '{{{lambda {x} {lambda {} x}} 13}}))
         '13)
+  (test/exn (interp-expr (parse '{{{lambda {x} {1}} 13}}))
+        "not a function")
 
   (test (interp-expr (parse '{let/cc esc {{lambda {x y} x} 1 {esc 3}}}))
         '3)
@@ -298,6 +294,10 @@
                                            {let/cc k {esc k}}}}
                               10}))
         '20)
+  (test (interp-expr (parse '{let/cc esc {{lambda {x y} {lambda {z} {+ z y}}}
+                                          1 
+                                           {let/cc k {esc k}}}}))
+        `continuation)
 ;|#
   ;;_______________________________________________________
   (test (interp-expr (parse '{neg 2}))
@@ -406,8 +406,10 @@
         (numV 35))
   (test (continue (appArgK (numC 5) mt-env (doneK)) (closV (list 'x) (idC 'x) mt-env))
         (numV 5))
-  ;(test (continue (doAppK (closV (list 'x) (idC 'x) mt-env) (doneK)) (numV 8))
-  ;(numV 8))
+  (test (continue (doAppK (list (closV (list 'x) (idC 'x) mt-env)) (doneK)) (numV 8))
+        (numV 8))
+  (test (continue (doAppK (list (contV (doneK))) (doneK)) (numV 8))
+        (numV 8))
 )
 
 ;; num+ and num* ----------------------------------------
