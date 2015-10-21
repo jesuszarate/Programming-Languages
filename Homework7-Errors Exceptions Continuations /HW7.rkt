@@ -167,7 +167,7 @@
                   (if0SecondK t f env k))]         
     [negC (e)
           (interp e env
-                  (doNegK k))] ; Implement it without using the add
+                  (doNegK k))]
     [avgC (f s t)
           (interp f env
                   (avgSecondK s t env k))]  
