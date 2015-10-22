@@ -47,7 +47,13 @@
   (lambda ([name : symbol] [vals : (listof 'a)]) : 'a
           (cond
            [(empty? vals)
-            (error 'find "not found")]
+            (if (equal? name 'object)
+                ;(ClassI 'object 'object empty empty)
+                ;(kons 'object 'object)
+                ;'object
+                
+                (error 'find "not found")
+                (error 'find "not found"))]
            [else (if (equal? name (name-of (first vals)))
                      (first vals)
                      ((make-find name-of) name (rest vals)))])))
@@ -97,7 +103,11 @@
         [thisC () this-val]
         [argC () arg-val]
         [newC (class-name field-exprs)
-              (local [(define c (find-class class-name classes))
+              (local [(define c
+                        (if (equal? class-name 'object)
+                            (classC class-name empty empty)
+                            (find-class class-name classes)))
+                                            
                       (define vals (map recur field-exprs))]
                 (if (= (length vals) (length (classC-field-names c)))
                     (objV class-name vals)
@@ -602,6 +612,11 @@
       [objV (class-name field-vals) `object])))
 
 (module+ test
+
+  (test (interp-prog (list)
+                     '{new object})
+        `object)
+  ;;___________________________________________________
   (test (interp-prog
          (list
           '{class empty extends object
