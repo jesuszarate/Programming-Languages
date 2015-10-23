@@ -18,7 +18,9 @@
   [ssendC (obj-expr : ExprC)
           (class-name : symbol)
           (method-name : symbol)
-          (arg-expr : ExprC)])
+          (arg-expr : ExprC)]
+  [selectC (num : ExprC)
+           (object : ExprC)])
 
 (define-type ClassC
   [classC (name : symbol)
@@ -96,8 +98,7 @@
               (local [(define c
                         (if (equal? class-name 'object)
                             (classC class-name empty empty)
-                            (find-class class-name classes)))
-                                            
+                            (find-class class-name classes)))                                            
                       (define vals (map recur field-exprs))]
                 (if (= (length vals) (length (classC-field-names c)))
                     (objV class-name vals)
@@ -122,7 +123,24 @@
                 (local [(define obj (recur obj-expr))
                         (define arg-val (recur arg-expr))]
                   (call-method class-name method-name classes
-                               obj arg-val))]))))
+                               obj arg-val))]
+        [selectC (num object)
+                 (type-case Value (recur object)
+                   [objV (class-name field-vals)
+                         (if (equal? (recur num) (numV 0))
+                             (call-method class-name 'zero classes
+                                          (recur object) arg-val)
+                             (call-method class-name 'nonzero classes
+                                          (recur object) arg-val)
+                             ;(numV 1)
+                             ;(type-case ClassC (find-class 'zero classes)
+                              ; [classC (name field-names methods)
+                               ;        )])
+                             )]
+                   [else (error 'interp "not a object")])]))))
+                   ;[else (error 'not "not an object")]
+        
+        
 
 (define (call-method class-name method-name classes
                      obj arg-val)
@@ -163,7 +181,9 @@
            (methodC 'addX
                     (plusC (getC (thisC) 'x) (argC)))
            (methodC 'multY (multC (argC) (getC (thisC) 'y)))
-           (methodC 'factory12 (newC 'posn (list (numC 1) (numC 2)))))))
+           (methodC 'factory12 (newC 'posn (list (numC 1) (numC 2))))
+           {methodC 'zero {plusC (numC 0) (numC 0)}}
+           {methodC 'nonzero (numC 1)})))
 
   (define posn3D-class
     (classC 
@@ -171,7 +191,8 @@
      (list 'x 'y 'z)
      (list (methodC 'mdist (plusC (getC (thisC) 'z)
                                   (ssendC (thisC) 'posn 'mdist (argC))))
-           (methodC 'addDist (ssendC (thisC) 'posn 'addDist (argC))))))
+           (methodC 'addDist (ssendC (thisC) 'posn 'addDist (argC)))
+           )))  
 
   (define posn27 (newC 'posn (list (numC 2) (numC 7))))
   (define posn531 (newC 'posn3D (list (numC 5) (numC 3) (numC 1))))
@@ -182,6 +203,12 @@
 ;; ----------------------------------------
 
 (module+ test
+  (test (interp-posn (selectC (numC 0) (newC 'posn (list (numC 2) (numC 7)))))
+        (numV 0))
+  
+  (test (interp-posn (selectC (numC 1) (newC 'posn (list (numC 2) (numC 7)))))                
+        (numV 1))
+  ;;_______________________________________________________________
   (test (interp (numC 10) 
                 empty (numV -1) (numV -1))
         (numV 10))

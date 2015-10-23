@@ -21,7 +21,9 @@
          (method-name : symbol)
          (arg-expr : ExprI)]
   [superI (method-name : symbol)
-          (arg-expr : ExprI)])
+          (arg-expr : ExprI)]
+  [selectI (num : ExprI)
+           (object : ExprI)])
 
 (define-type ClassI
   [classI (name : symbol)
@@ -59,7 +61,9 @@
               (ssendC (thisC)
                       super-name
                       method-name
-                      (recur arg-expr))])))
+                      (recur arg-expr))]
+      [selectI (num object)
+               (selectC (recur num) (recur object))])))
 
 (module+ test
   (test (expr-i->c (numI 10) 'object)

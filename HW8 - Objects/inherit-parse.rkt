@@ -56,6 +56,10 @@
    [(s-exp-match? '{super SYMBOL ANY} s)
     (superI (s-exp->symbol (second (s-exp->list s)))
             (parse (third (s-exp->list s))))]
+   
+   [(s-exp-match? '{select ANY ANY} s)
+    (selectI (parse (second (s-exp->list s)))
+             (parse (third (s-exp->list s))))]
    [else (error 'parse "invalid input")]))
 
 (module+ test
@@ -111,6 +115,20 @@
       [objV (class-name field-vals) `object])))
 
 (module+ test
+
+  (test (interp-prog (list '{class snowball extends object
+                              {size}
+                              {zero this}
+                              {nonzero {new snowball {+ 1 {get this size}}}}})
+                     '{get {select 0 {new snowball 1}} size})
+        '1)
+  (test (interp-prog (list '{class snowball extends object
+                                   {size}
+                                   {zero this}
+                                   {nonzero {new snowball {+ 1 {get this size}}}}})
+                     '{get {select {+ 1 2} {new snowball 1}} size})
+        '2)
+  ;;----------------------------------------------
   (test (interp-prog
          (list
           '{class empty extends object
