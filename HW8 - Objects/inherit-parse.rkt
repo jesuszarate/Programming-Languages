@@ -62,7 +62,7 @@
              (parse (third (s-exp->list s))))]
    [else (error 'parse "invalid input")]))
 
-(module+ test
+(module+ test  
   (test (parse '0)
         (numI 0))
   (test (parse `arg)
@@ -116,6 +116,22 @@
 
 (module+ test
 
+  (test (interp-prog (list '{class fish extends object
+                                   {size color}})
+                     '{instanceof {new fish 1 2} fish})
+        '0)
+  
+  (test (interp-prog (list '{class fish extends object
+                                   {size color}})
+                     '{instanceof {new fish 1 2} fish})
+        '0)
+  (test (interp-prog (list '{class fish extends object
+                                   {size color}}
+                           '{class shark extends fish
+                                   {teeth}})
+                     '{instanceof {new shark 1 2 3} fish})
+        '0)
+  ;;----------------------------------------------
   (test (interp-prog (list '{class snowball extends object
                               {size}
                               {zero this}
