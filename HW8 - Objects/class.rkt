@@ -20,7 +20,9 @@
           (method-name : symbol)
           (arg-expr : ExprC)]
   [selectC (num : ExprC)
-           (object : ExprC)])
+           (object : ExprC)]
+  [instanceofC (exp : ExprC)
+               (sym : symbol)])
 
 (define-type ClassC
   [classC (name : symbol)
@@ -137,7 +139,9 @@
                               ; [classC (name field-names methods)
                                ;        )])
                              )]
-                   [else (error 'interp "not a object")])]))))
+                   [else (error 'interp "not a object")])]
+        [instanceofC (exp sym) (numV -1)]))))
+;;{instanceof <Expr> <Sym>}
                    ;[else (error 'not "not an object")]
         
         

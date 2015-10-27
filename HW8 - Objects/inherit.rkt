@@ -23,7 +23,11 @@
   [superI (method-name : symbol)
           (arg-expr : ExprI)]
   [selectI (num : ExprI)
-           (object : ExprI)])
+           (object : ExprI)]
+  [instanceofI (exp : ExprI)
+              (sym : symbol)])
+;{instanceof <Expr> <Sym>}
+
 
 (define-type ClassI
   [classI (name : symbol)
@@ -63,7 +67,10 @@
                       method-name
                       (recur arg-expr))]
       [selectI (num object)
-               (selectC (recur num) (recur object))])))
+               (selectC (recur num) (recur object))]
+      [instanceofI (exp sym) (instanceofC (recur exp) sym)])))
+
+
 
 (module+ test
   (test (expr-i->c (numI 10) 'object)
