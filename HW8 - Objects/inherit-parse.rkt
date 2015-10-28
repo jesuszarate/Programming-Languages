@@ -116,6 +116,56 @@
 
 (module+ test
 
+  ;; Part 5 — More Extra Credit: Objects as Numbers ----------------------------------------------
+
+  (test (interp-prog (list
+                      '{class zero extends object
+                              {}
+                              {plus arg}
+                              {mult this}
+                              {select {send arg zero 0}}})
+                     '{+ 7 {* 8 {new zero}}})
+        '7)
+  (test (interp-prog (list
+                      '{class infinity extends object
+                              {}
+                              {plus this}
+                              {mult this}
+                              {select {send arg nonzero 0}}})
+                     '{+ 7 {new infinity}})
+        `object)
+  (test (interp-prog (list
+                      '{class infinity extends object
+                              {}
+                              {plus this}
+                              {mult this}
+                              {select {send arg nonzero 0}}}
+                      '{class snowball extends object
+                                   {size}
+                                   {zero this}
+                                   {nonzero {new snowball {+ 1 {get this size}}}}})
+                     '{get {select {new infinity} {new snowball 3}} size})
+        '4)
+  
+  ;; Part 4 — Extra Credit: Numbers as Objects ----------------------------------------------
+
+  (test (interp-prog (list)
+                     '{instanceof 8 object})
+        '0)
+  (test (interp-prog (list)
+                     '{send 8 plus 9})
+        '17)
+  (test (interp-prog (list)
+                     '{send 8 mult 9})
+        '72)
+  (test (interp-prog (list '{class snowball extends object
+                                   {size}
+                                   {zero this}
+                                   {nonzero {new snowball {+ 1 {get this size}}}}})
+                     '{get {send 8 select {new snowball 10}} size})
+        '11)
+
+  ;;----------------------------------------------
   (test (interp-prog (list '{class fish extends object
                                    {size color}})
                      '{instanceof {new fish 1 2} fish})
