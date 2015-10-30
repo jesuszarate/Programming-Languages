@@ -141,10 +141,13 @@
                        [objV (o-class-name field-vals)
                              (if (equal? class-name 'object)
                                  (numV 0)
-                                 (numV 1))]
-                       [else (error 'inerp "not an object")])]
+                                 
+                                 (numV 1)
+                                 
+                                 )]
+                       [else (error 'interp "not an object")])]
         ))))        
-        
+       
 
 (define (call-method class-name method-name classes
                      obj arg-val)
@@ -207,6 +210,20 @@
 ;; ----------------------------------------
 
 (module+ test
+
+  ;(bad (interp-posn (instanceofC (newC 'posn (list (numC 2) (numC 7))) 'posn))
+   ;    (numV 1) (numV 0) "at line 214")
+
+  (test (interp-posn (instanceofC (newC 'posn (list (numC 2) (numC 7))) 'posn))
+        (numV 0))
+
+  (test (interp-posn (instanceofC (newC 'posn3D (list (numC 1) (numC 2) (numC 3))) 'posn))
+        (numV 0))
+  
+  (test (interp-posn (instanceofC (newC 'posn (list (numC 2) (numC 7))) 'object))
+        (numV 0))
+  
+  ;;_______________________________________________________________
   (test (interp-posn (selectC (numC 0) (newC 'posn (list (numC 2) (numC 7)))))
         (numV 0))
   

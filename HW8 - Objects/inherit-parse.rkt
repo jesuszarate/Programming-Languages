@@ -149,6 +149,15 @@
                                    {teeth}})
                      '{instanceof {new shark 1 2 3} fish})
         '0)
+
+  (test (interp-prog (list '{class fish extends object
+                                   {size color}}
+                           '{class mamal extends object
+                                   {legs}}
+                           '{class shark extends fish
+                                   {teeth}})                           
+                     '{instanceof {new shark 1 2 3} fish})
+        '0)
    
   ;; Part 5 — More Extra Credit: Objects as Numbers ----------------------------------------------
 #|
