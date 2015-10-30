@@ -122,7 +122,8 @@
              name
              field-names
              (map (lambda (m) (method-i->c m super-name))
-                  methods))]))
+                  methods)
+             super-name)]))
 
 (module+ test
   (define posn3d-i-class 
@@ -133,7 +134,8 @@
   (define posn3d-c-class-not-flat
     (classC 'posn3d
             (list 'z)
-            (list posn3d-mdist-c-method)))
+            (list posn3d-mdist-c-method)
+            'posn))
   
   (test (class-i->c-not-flat posn3d-i-class)
         posn3d-c-class-not-flat))
@@ -144,13 +146,14 @@
                        [classes : (listof ClassC)] 
                        [i-classes : (listof ClassI)]) : ClassC
   (type-case ClassC c
-    [classC (name field-names methods)
+    [classC (name field-names methods super-name)
             (type-case ClassC (flatten-super name classes i-classes)
-              [classC (super-name super-field-names super-methods)
+              [classC (super-name super-field-names super-methods s-name)
                       (classC
                        name
                        (add-fields super-field-names field-names)
-                       (add/replace-methods super-methods methods))])]))
+                       (add/replace-methods super-methods methods)
+                       super-name)])]))
 
 (define (flatten-super [name : symbol]
                        [classes : (listof ClassC)] 
@@ -158,7 +161,7 @@
   (type-case ClassI (find-i-class name i-classes)
     [classI (name super-name field-names i-methods)
             (if (equal? super-name 'object)
-                (classC 'object empty empty)
+                (classC 'object empty empty super-name)
                 (flatten-class (find-class super-name classes)
                                classes
                                i-classes))]))
@@ -184,12 +187,14 @@
             (list (methodC 'mdist
                            (plusC (getC (thisC) 'x)
                                   (getC (thisC) 'y)))
-                  addDist-c-method)))
+                  addDist-c-method)
+            'object))
   (define posn3d-c-class
     (classC 'posn3d
             (list 'x 'y 'z)
             (list posn3d-mdist-c-method
-                  addDist-c-method)))
+                  addDist-c-method)
+            'posn))
 
   (test (flatten-class posn3d-c-class-not-flat
                        (list posn-c-class-not-flat

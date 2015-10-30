@@ -27,7 +27,8 @@
 (define-type ClassC
   [classC (name : symbol)
           (field-names : (listof symbol))
-          (methods : (listof MethodC))])
+          (methods : (listof MethodC))
+          (super-name : symbol)])
 
 (define-type MethodC
   [methodC (name : symbol)
@@ -74,11 +75,11 @@
 (module+ test
   (test/exn (find-class 'a empty)
             "not found")
-  (test (find-class 'a (list (classC 'a empty empty)))
-        (classC 'a empty empty))
-  (test (find-class 'b (list (classC 'a empty empty)
-                             (classC 'b empty empty)))
-        (classC 'b empty empty))
+  (test (find-class 'a (list (classC 'a empty empty 'object)))
+        (classC 'a empty empty 'object))
+  (test (find-class 'b (list (classC 'a empty empty 'object)
+                             (classC 'b empty empty 'object)))
+        (classC 'b empty empty 'object))
   (test (get-field 'a 
                    (list 'a 'b)
                    (list (numV 0) (numV 1)))
@@ -99,7 +100,7 @@
         [newC (class-name field-exprs)
               (local [(define c
                         (if (equal? class-name 'object)
-                            (classC class-name empty empty)
+                            (classC class-name empty empty 'object)
                             (find-class class-name classes)))                                            
                       (define vals (map recur field-exprs))]
                 (if (= (length vals) (length (classC-field-names c)))
@@ -109,7 +110,7 @@
               (type-case Value (recur obj-expr)
                 [objV (class-name field-vals)
                       (type-case ClassC (find-class class-name classes)
-                        [classC (name field-names methods)
+                        [classC (name field-names methods super-name)
                                 (get-field field-name field-names 
                                            field-vals)])]
                 [else (error 'interp "not an object")])]
@@ -141,9 +142,12 @@
                        [objV (o-class-name field-vals)
                              (if (equal? class-name 'object)
                                  (numV 0)
-                                 
-                                 (numV 1)
-                                 
+                                 (type-case ClassC (find-class o-class-name classes)
+                                   [classC (name field-names methods super-name)
+                                           (if (or (equal? class-name super-name)
+                                                   (equal? 'object super-name))
+                                               (numV 0)
+                                               (numV 1))])                                 
                                  )]
                        [else (error 'interp "not an object")])]
         ))))        
@@ -152,7 +156,7 @@
 (define (call-method class-name method-name classes
                      obj arg-val)
   (type-case ClassC (find-class class-name classes)
-    [classC (name field-names methods)
+    [classC (name field-names methods super-name)
             (type-case MethodC (find-method method-name methods)
               [methodC (name body-expr)
                        (interp body-expr
@@ -190,7 +194,8 @@
            (methodC 'multY (multC (argC) (getC (thisC) 'y)))
            (methodC 'factory12 (newC 'posn (list (numC 1) (numC 2))))
            {methodC 'zero {plusC (numC 0) (numC 0)}}
-           {methodC 'nonzero (numC 1)})))
+           {methodC 'nonzero (numC 1)})
+     'object))
 
   (define posn3D-class
     (classC 
@@ -199,7 +204,8 @@
      (list (methodC 'mdist (plusC (getC (thisC) 'z)
                                   (ssendC (thisC) 'posn 'mdist (argC))))
            (methodC 'addDist (ssendC (thisC) 'posn 'addDist (argC)))
-           )))  
+           )
+     'posn))  
 
   (define posn27 (newC 'posn (list (numC 2) (numC 7))))
   (define posn531 (newC 'posn3D (list (numC 5) (numC 3) (numC 1))))

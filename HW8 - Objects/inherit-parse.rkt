@@ -125,31 +125,33 @@
 
 (module+ test
 
+  ;1
   (test (interp-prog (list '{class fish extends object
                                    {size color}})
                      '{instanceof {new fish 1 2} fish})
         '0)
-  
+  ;2 
   (test (interp-prog (list '{class fish extends object
                                    {size color}})
                      '{instanceof {new fish 1 2} fish})
         '0)
-   (test (interp-prog (list '{class fish extends object
+  ;3
+  (test (interp-prog (list '{class fish extends object
                                    {size color}})
                      '{instanceof {new fish 1 2} object})
         '0)
-  
+  ;4
   (test/exn (interp-prog empty            
                          '{instanceof {+ 1 1} object})
             "not an object")
-  
+  ;5
   (test (interp-prog (list '{class fish extends object
                                    {size color}}
                            '{class shark extends fish
                                    {teeth}})
                      '{instanceof {new shark 1 2 3} fish})
         '0)
-
+  ;6
   (test (interp-prog (list '{class fish extends object
                                    {size color}}
                            '{class mamal extends object
