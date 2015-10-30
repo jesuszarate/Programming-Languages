@@ -21,8 +21,8 @@
           (arg-expr : ExprC)]
   [selectC (num : ExprC)
            (object : ExprC)]
-  [instanceofC (exp : ExprC)
-               (sym : symbol)])
+  [instanceofC (object : ExprC)
+               (class-name : symbol)])
 
 (define-type ClassC
   [classC (name : symbol)
@@ -134,16 +134,16 @@
                                           (recur object) arg-val)
                              (call-method class-name 'nonzero classes
                                           (recur object) arg-val)
-                             ;(numV 1)
-                             ;(type-case ClassC (find-class 'zero classes)
-                              ; [classC (name field-names methods)
-                               ;        )])
                              )]
                    [else (error 'interp "not a object")])]
-        [instanceofC (exp sym) (numV -1)]))))
-;;{instanceof <Expr> <Sym>}
-                   ;[else (error 'not "not an object")]
-        
+        [instanceofC (object class-name)
+                     (type-case Value (recur object)
+                       [objV (o-class-name field-vals)
+                             (if (equal? class-name 'object)
+                                 (numV 0)
+                                 (numV 1))]
+                       [else (error 'inerp "not an object")])]
+        ))))        
         
 
 (define (call-method class-name method-name classes

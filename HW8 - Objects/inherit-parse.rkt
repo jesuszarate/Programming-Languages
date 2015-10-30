@@ -6,6 +6,7 @@
 (module+ test
   (print-only-errors true))
 
+
 ;; ----------------------------------------
 
 (define (parse-class [s : s-expression]) : ClassI
@@ -60,6 +61,9 @@
    [(s-exp-match? '{select ANY ANY} s)
     (selectI (parse (second (s-exp->list s)))
              (parse (third (s-exp->list s))))]
+   [(s-exp-match? '{instanceof ANY SYMBOL} s)
+    (instanceofI (parse (second (s-exp->list s)))
+                 (s-exp->symbol (third (s-exp->list s))))]
    [else (error 'parse "invalid input")]))
 
 (module+ test  
@@ -114,10 +118,40 @@
       [numV (n) (number->s-exp n)]
       [objV (class-name field-vals) `object])))
 
+
+
+
+
+
 (module+ test
 
+  (test (interp-prog (list '{class fish extends object
+                                   {size color}})
+                     '{instanceof {new fish 1 2} fish})
+        '0)
+  
+  (test (interp-prog (list '{class fish extends object
+                                   {size color}})
+                     '{instanceof {new fish 1 2} fish})
+        '0)
+   (test (interp-prog (list '{class fish extends object
+                                   {size color}})
+                     '{instanceof {new fish 1 2} object})
+        '0)
+  
+  (test/exn (interp-prog empty            
+                         '{instanceof {+ 1 1} object})
+            "not an object")
+  
+  (test (interp-prog (list '{class fish extends object
+                                   {size color}}
+                           '{class shark extends fish
+                                   {teeth}})
+                     '{instanceof {new shark 1 2 3} fish})
+        '0)
+   
   ;; Part 5 — More Extra Credit: Objects as Numbers ----------------------------------------------
-
+#|
   (test (interp-prog (list
                       '{class zero extends object
                               {}
@@ -159,28 +193,15 @@
                      '{send 8 mult 9})
         '72)
   (test (interp-prog (list '{class snowball extends object
-                                   {size}
-                                   {zero this}
-                                   {nonzero {new snowball {+ 1 {get this size}}}}})
+                              {size}
+                              {zero this}
+                              {nonzero {new snowball {+ 1 {get this size}}}}})
                      '{get {send 8 select {new snowball 10}} size})
         '11)
-
-  ;;----------------------------------------------
-  (test (interp-prog (list '{class fish extends object
-                                   {size color}})
-                     '{instanceof {new fish 1 2} fish})
-        '0)
   
-  (test (interp-prog (list '{class fish extends object
-                                   {size color}})
-                     '{instanceof {new fish 1 2} fish})
-        '0)
-  (test (interp-prog (list '{class fish extends object
-                                   {size color}}
-                           '{class shark extends fish
-                                   {teeth}})
-                     '{instanceof {new shark 1 2 3} fish})
-        '0)
+|#
+  ;;----------------------------------------------
+  
   ;;----------------------------------------------
   (test (interp-prog (list '{class snowball extends object
                               {size}

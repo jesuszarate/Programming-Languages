@@ -24,8 +24,8 @@
           (arg-expr : ExprI)]
   [selectI (num : ExprI)
            (object : ExprI)]
-  [instanceofI (exp : ExprI)
-              (sym : symbol)])
+  [instanceofI (object : ExprI)
+              (class-name : symbol)])
 ;{instanceof <Expr> <Sym>}
 
 
@@ -68,7 +68,7 @@
                       (recur arg-expr))]
       [selectI (num object)
                (selectC (recur num) (recur object))]
-      [instanceofI (exp sym) (instanceofC (recur exp) sym)])))
+      [instanceofI (object class-name) (instanceofC (recur object) class-name)])))
 
 
 
