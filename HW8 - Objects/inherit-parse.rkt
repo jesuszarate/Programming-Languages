@@ -125,6 +125,10 @@
 
 (module+ test
 
+  (test (interp-prog (list)
+                     '{new object})
+        `object)
+;;___________________________________________
   ;1
   (test (interp-prog (list '{class fish extends object
                                    {size color}})
