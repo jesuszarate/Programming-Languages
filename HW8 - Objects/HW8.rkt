@@ -1,8 +1,6 @@
 #lang plai-typed
 (require plai-typed/s-exp-match)
 
-;; ============================================================
-;; classes without inheritance
 
 (define-type ExprC
   [numC (n : number)]
@@ -22,12 +20,17 @@
   [ssendC (obj-expr : ExprC)
           (class-name : symbol)
           (method-name : symbol)
-          (arg-expr : ExprC)])
+          (arg-expr : ExprC)]
+  [selectC (num : ExprC)
+           (object : ExprC)]
+  [instanceofC (object : ExprC)
+               (class-name : symbol)])
 
 (define-type ClassC
   [classC (name : symbol)
           (field-names : (listof symbol))
-          (methods : (listof MethodC))])
+          (methods : (listof MethodC))
+          (super-name : symbol)])
 
 (define-type MethodC
   [methodC (name : symbol)
@@ -45,18 +48,12 @@
 
 (define (make-find [name-of : ('a -> symbol)])
   (lambda ([name : symbol] [vals : (listof 'a)]) : 'a
-          (cond
-           [(empty? vals)
-            (if (equal? name 'object)
-                ;(ClassI 'object 'object empty empty)
-                ;(kons 'object 'object)
-                ;'object
-                
-                (error 'find "not found")
-                (error 'find "not found"))]
-           [else (if (equal? name (name-of (first vals)))
-                     (first vals)
-                     ((make-find name-of) name (rest vals)))])))
+    (cond
+     [(empty? vals)
+      (error 'find "not found")]
+     [else (if (equal? name (name-of (first vals)))
+               (first vals)
+               ((make-find name-of) name (rest vals)))])))
 
 (define find-class : (symbol (listof ClassC) -> ClassC)
   (make-find classC-name))
@@ -80,11 +77,11 @@
 (module+ test
   (test/exn (find-class 'a empty)
             "not found")
-  (test (find-class 'a (list (classC 'a empty empty)))
-        (classC 'a empty empty))
-  (test (find-class 'b (list (classC 'a empty empty)
-                             (classC 'b empty empty)))
-        (classC 'b empty empty))
+  (test (find-class 'a (list (classC 'a empty empty 'object)))
+        (classC 'a empty empty 'object))
+  (test (find-class 'b (list (classC 'a empty empty 'object)
+                             (classC 'b empty empty 'object)))
+        (classC 'b empty empty 'object))
   (test (get-field 'a 
                    (list 'a 'b)
                    (list (numV 0) (numV 1)))
@@ -105,9 +102,8 @@
         [newC (class-name field-exprs)
               (local [(define c
                         (if (equal? class-name 'object)
-                            (classC class-name empty empty)
-                            (find-class class-name classes)))
-                                            
+                            (classC class-name empty empty 'object)
+                            (find-class class-name classes)))                                            
                       (define vals (map recur field-exprs))]
                 (if (= (length vals) (length (classC-field-names c)))
                     (objV class-name vals)
@@ -116,7 +112,7 @@
               (type-case Value (recur obj-expr)
                 [objV (class-name field-vals)
                       (type-case ClassC (find-class class-name classes)
-                        [classC (name field-names methods)
+                        [classC (name field-names methods super-name)
                                 (get-field field-name field-names 
                                            field-vals)])]
                 [else (error 'interp "not an object")])]
@@ -132,12 +128,37 @@
                 (local [(define obj (recur obj-expr))
                         (define arg-val (recur arg-expr))]
                   (call-method class-name method-name classes
-                               obj arg-val))]))))
+                               obj arg-val))]
+        [selectC (num object)
+                 (type-case Value (recur object)
+                   [objV (class-name field-vals)
+                         (if (equal? (recur num) (numV 0))
+                             (call-method class-name 'zero classes
+                                          (recur object) arg-val)
+                             (call-method class-name 'nonzero classes
+                                          (recur object) arg-val)
+                             )]
+                   [else (error 'interp "not a object")])]
+        [instanceofC (object class-name)
+                     (type-case Value (recur object)
+                       [objV (o-class-name field-vals)
+                             (if (equal? class-name 'object)
+                                 (numV 0)
+                                 (type-case ClassC (find-class o-class-name classes)
+                                   [classC (name field-names methods super-name)
+                                           (if (or (equal? class-name super-name)
+                                                   (equal? 'object super-name))
+                                               (numV 0)
+                                               (numV 1))])                                 
+                                 )]
+                       [else (error 'interp "not an object")])]
+        ))))        
+       
 
 (define (call-method class-name method-name classes
                      obj arg-val)
   (type-case ClassC (find-class class-name classes)
-    [classC (name field-names methods)
+    [classC (name field-names methods super-name)
             (type-case MethodC (find-method method-name methods)
               [methodC (name body-expr)
                        (interp body-expr
@@ -173,7 +194,10 @@
            (methodC 'addX
                     (plusC (getC (thisC) 'x) (argC)))
            (methodC 'multY (multC (argC) (getC (thisC) 'y)))
-           (methodC 'factory12 (newC 'posn (list (numC 1) (numC 2)))))))
+           (methodC 'factory12 (newC 'posn (list (numC 1) (numC 2))))
+           {methodC 'zero {plusC (numC 0) (numC 0)}}
+           {methodC 'nonzero (numC 1)})
+     'object))
 
   (define posn3D-class
     (classC 
@@ -181,7 +205,9 @@
      (list 'x 'y 'z)
      (list (methodC 'mdist (plusC (getC (thisC) 'z)
                                   (ssendC (thisC) 'posn 'mdist (argC))))
-           (methodC 'addDist (ssendC (thisC) 'posn 'addDist (argC))))))
+           (methodC 'addDist (ssendC (thisC) 'posn 'addDist (argC)))
+           )
+     'posn))  
 
   (define posn27 (newC 'posn (list (numC 2) (numC 7))))
   (define posn531 (newC 'posn3D (list (numC 5) (numC 3) (numC 1))))
@@ -192,6 +218,26 @@
 ;; ----------------------------------------
 
 (module+ test
+
+  ;(bad (interp-posn (instanceofC (newC 'posn (list (numC 2) (numC 7))) 'posn))
+   ;    (numV 1) (numV 0) "at line 214")
+
+  (test (interp-posn (instanceofC (newC 'posn (list (numC 2) (numC 7))) 'posn))
+        (numV 0))
+
+  (test (interp-posn (instanceofC (newC 'posn3D (list (numC 1) (numC 2) (numC 3))) 'posn))
+        (numV 0))
+  
+  (test (interp-posn (instanceofC (newC 'posn (list (numC 2) (numC 7))) 'object))
+        (numV 0))
+  
+  ;;_______________________________________________________________
+  (test (interp-posn (selectC (numC 0) (newC 'posn (list (numC 2) (numC 7)))))
+        (numV 0))
+  
+  (test (interp-posn (selectC (numC 1) (newC 'posn (list (numC 2) (numC 7)))))                
+        (numV 1))
+  ;;_______________________________________________________________
   (test (interp (numC 10) 
                 empty (numV -1) (numV -1))
         (numV 10))
@@ -230,8 +276,12 @@
   (test/exn (interp-posn (newC 'posn (list (numC 0))))
             "wrong field count"))
 
-;; ============================================================
-;; inherit
+
+
+;; Make all "class.rkt" definitions available here, where
+;; the "class.rkt" file must be in the same directory
+;; as this one:
+;(require "class.rkt")
 
 (define-type ExprI
   [numI (n : number)]
@@ -249,7 +299,13 @@
          (method-name : symbol)
          (arg-expr : ExprI)]
   [superI (method-name : symbol)
-          (arg-expr : ExprI)])
+          (arg-expr : ExprI)]
+  [selectI (num : ExprI)
+           (object : ExprI)]
+  [instanceofI (object : ExprI)
+              (class-name : symbol)])
+;{instanceof <Expr> <Sym>}
+
 
 (define-type ClassI
   [classI (name : symbol)
@@ -287,7 +343,12 @@
               (ssendC (thisC)
                       super-name
                       method-name
-                      (recur arg-expr))])))
+                      (recur arg-expr))]
+      [selectI (num object)
+               (selectC (recur num) (recur object))]
+      [instanceofI (object class-name) (instanceofC (recur object) class-name)])))
+
+
 
 (module+ test
   (test (expr-i->c (numI 10) 'object)
@@ -339,7 +400,8 @@
              name
              field-names
              (map (lambda (m) (method-i->c m super-name))
-                  methods))]))
+                  methods)
+             super-name)]))
 
 (module+ test
   (define posn3d-i-class 
@@ -350,7 +412,8 @@
   (define posn3d-c-class-not-flat
     (classC 'posn3d
             (list 'z)
-            (list posn3d-mdist-c-method)))
+            (list posn3d-mdist-c-method)
+            'posn))
   
   (test (class-i->c-not-flat posn3d-i-class)
         posn3d-c-class-not-flat))
@@ -361,13 +424,14 @@
                        [classes : (listof ClassC)] 
                        [i-classes : (listof ClassI)]) : ClassC
   (type-case ClassC c
-    [classC (name field-names methods)
+    [classC (name field-names methods super-name)
             (type-case ClassC (flatten-super name classes i-classes)
-              [classC (super-name super-field-names super-methods)
+              [classC (super-name super-field-names super-methods s-name)
                       (classC
                        name
                        (add-fields super-field-names field-names)
-                       (add/replace-methods super-methods methods))])]))
+                       (add/replace-methods super-methods methods)
+                       super-name)])]))
 
 (define (flatten-super [name : symbol]
                        [classes : (listof ClassC)] 
@@ -375,7 +439,7 @@
   (type-case ClassI (find-i-class name i-classes)
     [classI (name super-name field-names i-methods)
             (if (equal? super-name 'object)
-                (classC 'object empty empty)
+                (classC 'object empty empty super-name)
                 (flatten-class (find-class super-name classes)
                                classes
                                i-classes))]))
@@ -401,12 +465,14 @@
             (list (methodC 'mdist
                            (plusC (getC (thisC) 'x)
                                   (getC (thisC) 'y)))
-                  addDist-c-method)))
+                  addDist-c-method)
+            'object))
   (define posn3d-c-class
     (classC 'posn3d
             (list 'x 'y 'z)
             (list posn3d-mdist-c-method
-                  addDist-c-method)))
+                  addDist-c-method)
+            'posn))
 
   (test (flatten-class posn3d-c-class-not-flat
                        (list posn-c-class-not-flat
@@ -501,11 +567,14 @@
                posn3d-i-class))
         (numV 18)))
 
-;; ============================================================
-;; parse & interp-prog
+;#lang plai-typed
+;(require plai-typed/s-exp-match
+ ;        "class.rkt"
+  ;       "inherit.rkt")
 
 (module+ test
   (print-only-errors true))
+
 
 ;; ----------------------------------------
 
@@ -557,9 +626,16 @@
    [(s-exp-match? '{super SYMBOL ANY} s)
     (superI (s-exp->symbol (second (s-exp->list s)))
             (parse (third (s-exp->list s))))]
+   
+   [(s-exp-match? '{select ANY ANY} s)
+    (selectI (parse (second (s-exp->list s)))
+             (parse (third (s-exp->list s))))]
+   [(s-exp-match? '{instanceof ANY SYMBOL} s)
+    (instanceofI (parse (second (s-exp->list s)))
+                 (s-exp->symbol (third (s-exp->list s))))]
    [else (error 'parse "invalid input")]))
 
-(module+ test
+(module+ test  
   (test (parse '0)
         (numI 0))
   (test (parse `arg)
@@ -611,12 +687,146 @@
       [numV (n) (number->s-exp n)]
       [objV (class-name field-vals) `object])))
 
+
+
+
+
+
 (module+ test
 
+
+  (test (interp-prog
+         (list
+          '{class invert extends object ()
+             (nonzero arg)
+             (zero 1)}
+          '(class also-invert extends invert ()
+             (repeat this)))
+         '(select 1 (send (new also-invert) repeat 0)))
+        '1)
+  
+  ;; ----------------------------------------
   (test (interp-prog (list)
                      '{new object})
         `object)
-  ;;___________________________________________________
+  
+  ;; ----------------------------------------
+  ;1
+  (test (interp-prog (list '{class fish extends object
+                                   {size color}})
+                     '{instanceof {new fish 1 2} fish})
+        '0)
+  ;2 
+  (test (interp-prog (list '{class fish extends object
+                                   {size color}})
+                     '{instanceof {new fish 1 2} fish})
+        '0)
+  ;3
+  (test (interp-prog (list '{class fish extends object
+                                   {size color}})
+                     '{instanceof {new fish 1 2} object})
+        '0)
+  ;4
+  (test/exn (interp-prog empty            
+                         '{instanceof {+ 1 1} object})
+            "not an object")
+  ;5
+  (test (interp-prog (list '{class fish extends object
+                                   {size color}}
+                           '{class shark extends fish
+                                   {teeth}})
+                     '{instanceof {new shark 1 2 3} fish})
+        '0)
+  ;6
+  (test (interp-prog (list '{class fish extends object
+                                   {size color}}
+                           '{class mamal extends object
+                                   {legs}}
+                           '{class shark extends fish
+                                   {teeth}})                           
+                     '{instanceof {new shark 1 2 3} fish})
+        '0)
+  (test (interp-prog (list '{class fish extends object
+                                   {size color}}
+                           '{class mamal extends object
+                                   {legs}}
+                           '{class shark extends fish
+                                   {teeth}})                           
+                     '{instanceof {new shark 1 2 3} mamal})
+        '1)
+   
+  ;; Part 5 — More Extra Credit: Objects as Numbers ----------------------------------------------
+#|
+  (test (interp-prog (list
+                      '{class zero extends object
+                              {}
+                              {plus arg}
+                              {mult this}
+                              {select {send arg zero 0}}})
+                     '{+ 7 {* 8 {new zero}}})
+        '7)
+  (test (interp-prog (list
+                      '{class infinity extends object
+                              {}
+                              {plus this}
+                              {mult this}
+                              {select {send arg nonzero 0}}})
+                     '{+ 7 {new infinity}})
+        `object)
+  (test (interp-prog (list
+                      '{class infinity extends object
+                              {}
+                              {plus this}
+                              {mult this}
+                              {select {send arg nonzero 0}}}
+                      '{class snowball extends object
+                                   {size}
+                                   {zero this}
+                                   {nonzero {new snowball {+ 1 {get this size}}}}})
+                     '{get {select {new infinity} {new snowball 3}} size})
+        '4)
+  
+  ;; Part 4 — Extra Credit: Numbers as Objects ----------------------------------------------
+
+  (test (interp-prog (list)
+                     '{instanceof 8 object})
+        '0)
+  (test (interp-prog (list)
+                     '{send 8 plus 9})
+        '17)
+  (test (interp-prog (list)
+                     '{send 8 mult 9})
+        '72)
+  (test (interp-prog (list '{class snowball extends object
+                              {size}
+                              {zero this}
+                              {nonzero {new snowball {+ 1 {get this size}}}}})
+                     '{get {send 8 select {new snowball 10}} size})
+        '11)
+  
+|#
+  ;;----------------------------------------------
+  
+  ;;----------------------------------------------
+  (test (interp-prog (list '{class snowball extends object
+                              {size}
+                              {zero this}
+                              {nonzero {new snowball {+ 1 {get this size}}}}})
+                     '{get {select 0 {new snowball 1}} size})
+        '1)
+  (test (interp-prog (list '{class snowball extends object
+                                   {size}
+                                   {zero this}
+                                   {nonzero {new snowball {+ 1 {get this size}}}}})
+                     '{get {select {+ 1 2} {new snowball 1}} size})
+        '2)
+  (test/exn (interp-prog (list '{class snowball extends object
+                                   {size}
+                                   {zero this}
+                                   {nonzero {new snowball {+ 1 {get this size}}}}})
+                     '{get {select {+ 1 2} {+ 1 1}} size})
+        "not a object")
+  ;;----------------------------------------------
   (test (interp-prog
          (list
           '{class empty extends object
