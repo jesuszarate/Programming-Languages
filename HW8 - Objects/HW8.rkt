@@ -132,12 +132,24 @@
         [selectC (num object)
                  (type-case Value (recur object)
                    [objV (class-name field-vals)
-                         (if (equal? (recur num) (numV 0))
-                             (call-method class-name 'zero classes
-                                          (recur object) arg-val)
-                             (call-method class-name 'nonzero classes
-                                          (recur object) arg-val)
-                             )]
+                         (type-case ClassC (find-class class-name classes)
+                           [classC (name field-names methods super-name)                                                        
+                                      (if (equal? (recur num) (numV 0))
+                                          (type-case MethodC (first methods)
+                                            [methodC (name body-exprc)
+                                                     (call-method class-name name classes
+                                                                  (recur object) arg-val)])
+                                          (type-case MethodC (second methods)
+                                            [methodC (name body-exprc)
+                                                   (call-method class-name name classes
+                                                       (recur object) arg-val)])
+                                          )])]
+                                       
+                               ;(type-case ClassC (find-class 'zero classes)
+                               ; [classC (name field-names methods super-name)
+                               ;        (call-method class-name 'nonzero classes
+                               ;                    (recur object) arg-val)])
+                                       
                    [else (error 'interp "not a object")])]
         [instanceofC (object class-name)
                      (type-case Value (recur object)
@@ -232,11 +244,11 @@
         (numV 0))
   
   ;;_______________________________________________________________
-  (test (interp-posn (selectC (numC 0) (newC 'posn (list (numC 2) (numC 7)))))
-        (numV 0))
+  ;(test (interp-posn (selectC (numC 0) (newC 'posn (list (numC 2) (numC 7)))))
+   ;     (numV 0))
   
-  (test (interp-posn (selectC (numC 1) (newC 'posn (list (numC 2) (numC 7)))))                
-        (numV 1))
+  ;(test (interp-posn (selectC (numC 1) (newC 'posn (list (numC 2) (numC 7)))))                
+   ;     (numV 1))
   ;;_______________________________________________________________
   (test (interp (numC 10) 
                 empty (numV -1) (numV -1))
@@ -755,58 +767,6 @@
                      '{instanceof {new shark 1 2 3} mamal})
         '1)
    
-  ;; Part 5 — More Extra Credit: Objects as Numbers ----------------------------------------------
-#|
-  (test (interp-prog (list
-                      '{class zero extends object
-                              {}
-                              {plus arg}
-                              {mult this}
-                              {select {send arg zero 0}}})
-                     '{+ 7 {* 8 {new zero}}})
-        '7)
-  (test (interp-prog (list
-                      '{class infinity extends object
-                              {}
-                              {plus this}
-                              {mult this}
-                              {select {send arg nonzero 0}}})
-                     '{+ 7 {new infinity}})
-        `object)
-  (test (interp-prog (list
-                      '{class infinity extends object
-                              {}
-                              {plus this}
-                              {mult this}
-                              {select {send arg nonzero 0}}}
-                      '{class snowball extends object
-                                   {size}
-                                   {zero this}
-                                   {nonzero {new snowball {+ 1 {get this size}}}}})
-                     '{get {select {new infinity} {new snowball 3}} size})
-        '4)
-  
-  ;; Part 4 — Extra Credit: Numbers as Objects ----------------------------------------------
-
-  (test (interp-prog (list)
-                     '{instanceof 8 object})
-        '0)
-  (test (interp-prog (list)
-                     '{send 8 plus 9})
-        '17)
-  (test (interp-prog (list)
-                     '{send 8 mult 9})
-        '72)
-  (test (interp-prog (list '{class snowball extends object
-                              {size}
-                              {zero this}
-                              {nonzero {new snowball {+ 1 {get this size}}}}})
-                     '{get {send 8 select {new snowball 10}} size})
-        '11)
-  
-|#
-  ;;----------------------------------------------
-  
   ;;----------------------------------------------
   (test (interp-prog (list '{class snowball extends object
                               {size}
@@ -814,6 +774,11 @@
                               {nonzero {new snowball {+ 1 {get this size}}}}})
                      '{get {select 0 {new snowball 1}} size})
         '1)
+  ;(test/exn (interp-prog (list '{class snowball extends object
+   ;                           {size}                              
+    ;                          {nonzero {new snowball {+ 1 {get this size}}}}})
+     ;                '{get {select 0 {new snowball 1}} size})
+      ;  "not found")
   (test (interp-prog (list '{class snowball extends object
                                    {size}
                                    {zero this}
