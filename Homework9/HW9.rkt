@@ -1,8 +1,10 @@
 #lang plai-typed
 (require plai-typed/s-exp-match)
 
+;NOTE: When we have an expression typecheck it!
 (define-type Value
   [numV (n : number)]
+  [boolV (b : boolean)]
   [closV (arg : symbol)
          (body : ExprC)
          (env : Env)])
@@ -18,7 +20,14 @@
         (arg-type : Type)
         (body : ExprC)]
   [appC (fun : ExprC)
-        (arg : ExprC)])
+        (arg : ExprC)]
+  [boolC (t : boolean)]
+  [equalC (lhs : ExprC)
+          (rhs : ExprC)]
+  [ifC (tst : ExprC)
+       (then : ExprC)
+       (els : ExprC)])
+  
 
 (define-type Type
   [numT]
@@ -48,6 +57,8 @@
 (define (parse [s : s-expression]) : ExprC
   (cond
     [(s-exp-match? `NUMBER s) (numC (s-exp->number s))]
+    [(s-exp-match? `true s) (boolC true)]
+    [(s-exp-match? `false s) (boolC false)]
     [(s-exp-match? `SYMBOL s) (idC (s-exp->symbol s))]
     [(s-exp-match? '{+ ANY ANY} s)
      (plusC (parse (second (s-exp->list s)))
@@ -55,6 +66,9 @@
     [(s-exp-match? '{* ANY ANY} s)
      (multC (parse (second (s-exp->list s)))
             (parse (third (s-exp->list s))))]
+    [(s-exp-match? '{= ANY ANY} s)
+     (equalC (parse (second (s-exp->list s)))
+              (parse (third (s-exp->list s))))]
     [(s-exp-match? '{let {[SYMBOL : ANY ANY]} ANY} s)
      (let ([bs (s-exp->list (first
                              (s-exp->list (second
@@ -70,6 +84,10 @@
        (lamC (s-exp->symbol (first arg))
              (parse-type (third arg))
              (parse (third (s-exp->list s)))))]
+    [(s-exp-match? '{if ANY ANY ANY} s)
+     (ifC (parse (second (s-exp->list s)))
+          (parse (third (s-exp->list s)))
+          (parse (fourth (s-exp->list s))))]    
     [(s-exp-match? '{ANY ANY} s)
      (appC (parse (first (s-exp->list s)))
            (parse (second (s-exp->list s))))]
@@ -80,7 +98,7 @@
    [(s-exp-match? `num s) 
     (numT)]
    [(s-exp-match? `bool s)
-    (boolT)]
+    (boolT)]   
    [(s-exp-match? `(ANY -> ANY) s)
     (arrowT (parse-type (first (s-exp->list s)))
             (parse-type (third (s-exp->list s))))]
@@ -122,9 +140,16 @@
 (define (interp [a : ExprC] [env : Env]) : Value
   (type-case ExprC a
     [numC (n) (numV n)]
+    [boolC (b) (boolV b)]
     [idC (s) (lookup s env)]
     [plusC (l r) (num+ (interp l env) (interp r env))]
     [multC (l r) (num* (interp l env) (interp r env))]
+    [equalC (lhs rhs)
+            (num-eq (interp lhs env) (interp rhs env))]
+    [ifC (t l r) 
+         (if (equal? #t (boolV-b (interp t env)))
+                     (interp l env)
+                     (interp r env))]         
     [lamC (n t body)
           (closV n body env)]
     [appC (fun arg) (type-case Value (interp fun env)
@@ -137,6 +162,10 @@
                       [else (error 'interp "not a function")])]))
 
 (module+ test
+
+  (test (interp (parse '{= 10 10}) mt-env)
+        (boolV true))
+  ;;----------------------------------------------------
   (test (interp (parse '2) mt-env)
         (numV 2))
   (test/exn (interp (parse `x) mt-env)
@@ -194,6 +223,16 @@
 (define (num* [l : Value] [r : Value]) : Value
   (num-op * l r))
 
+;; Implement for booleans as well (true and false)
+;;num=--------------------------------------------------
+(define (num-eq [l : Value] [r : Value]) : Value  
+  ;(cond
+   ;;[(and (numV? l) (numV? r))
+    (boolV (= (numV-n l) (numV-n r)))
+   ;[else
+    ;(error 'interp "not a number")])
+  )
+
 (module+ test
   (test (num+ (numV 1) (numV 2))
         (numV 3))
@@ -231,8 +270,19 @@
 (define (typecheck [a : ExprC] [tenv : TypeEnv])
   (type-case ExprC a
     [numC (n) (numT)]
+    [boolC (t) (boolT)]    
     [plusC (l r) (typecheck-nums l r tenv)]
     [multC (l r) (typecheck-nums l r tenv)]
+    [equalC (l r) (typecheck-nums-bools l r tenv)]
+    [ifC (tst thn els)
+         (type-case Type (typecheck-bool tst tenv)
+           [boolT ()
+                  (local [(define t (typecheck thn tenv))
+                          (define e (typecheck els tenv))]
+                    (if (equal? t e)
+                        t
+                        (type-error t "no type")))]
+           [else (type-error tst "bool")])]
     [idC (n) (type-lookup n tenv)]
     [lamC (n arg-type body)
           (arrowT arg-type
@@ -249,6 +299,11 @@
                                     (to-string arg-type)))]
             [else (type-error fun "function")])]))
 
+(define (typecheck-bool tst tenv)
+  (type-case Type (typecheck tst tenv)
+    [boolT () (boolT)]
+    [else (type-error tst "bool")]))
+
 (define (typecheck-nums l r tenv)
   (type-case Type (typecheck l tenv)
     [numT ()
@@ -256,6 +311,19 @@
             [numT () (numT)]
             [else (type-error r "num")])]
     [else (type-error l "num")]))
+
+(define (typecheck-nums-bools l r tenv)
+  (type-case Type (typecheck l tenv)
+    [numT ()
+          (type-case Type (typecheck r tenv)
+            [numT () (boolT)]
+            [else (type-error r "num")])]
+    [boolT ()
+           (type-case Type (typecheck r tenv)
+             [boolT () (boolT)]
+             [else (type-error r "bool")])]
+    [else (type-error l "num")]))
+
 
 (define (type-error a msg)
   (error 'typecheck (string-append
@@ -269,6 +337,98 @@
   (make-lookup tbind-name tbind-type))
 
 (module+ test
+
+  #|;;Part 2 — Pairs ---------------------------------------
+  (test (interp (parse '{cons 10 8})
+                mt-env)
+        ;; Your constructor might be different than consV:
+        (consV (numV 10) (numV 8)))
+  
+  (test (interp (parse '{first {cons 10 8}})
+                mt-env)
+        (numV 10))
+  
+  (test (interp (parse '{rest {cons 10 8}})
+                mt-env)
+        (numV 8))
+  
+  (test (typecheck (parse '{cons 10 8})
+                   mt-env)
+        ;; Your constructor might be different than crossT:
+        (crossT (numT) (numT)))
+  
+  (test (typecheck (parse '{first {cons 10 8}})
+                   mt-env)
+        (numT))
+  
+  (test (typecheck (parse '{+ 1 {rest {cons 10 8}}})
+                   mt-env)
+        (numT))
+  
+  (test (typecheck (parse '{lambda {[x : (num * bool)]}
+                             {first x}})
+                   mt-env)
+        ;; Your constructor might be different than crossT:
+        (arrowT (crossT (numT) (boolT)) (numT)))
+  
+  (test (typecheck (parse '{{lambda {[x : (num * bool)]}
+                              {first x}}
+                            {cons 1 false}})
+                   mt-env)
+        (numT))
+  
+  (test (typecheck (parse '{{lambda {[x : (num * bool)]}
+                              {rest x}}
+                            {cons 1 false}})
+                   mt-env)
+        (boolT))
+  
+  (test/exn (typecheck (parse '{first 10})
+                       mt-env)
+            "no type")
+  
+  (test/exn (typecheck (parse '{+ 1 {first {cons false 8}}})
+                       mt-env)
+            "no type")
+  
+  (test/exn (typecheck (parse '{lambda {[x : (num * bool)]}
+                                 {if {first x}
+                                     1
+                                     2}})
+                       mt-env)
+            "no type")
+|#
+  ;;Part 1 — true, false, =, and if----------------------
+  
+  
+  (test (interp (parse '{if {= 13 {if {= 1 {+ -1 2}}
+                                      12
+                                      13}}
+                            4
+                            5})
+                mt-env)
+         (numV 5))
+  
+  (test/exn (typecheck (parse '{if true 1 false}) mt-env)
+        "no type")
+  
+  (test (typecheck (parse '{= 13 {if {= 1 {+ -1 2}}
+                                     12
+                                     13}})
+                   mt-env)
+         (boolT))
+  
+  (test/exn (typecheck (parse '{+ 1 {if true true false}})
+                       mt-env)
+            "no type")
+  ;;-----------------------------------------------------
+  (test (typecheck (parse '{= 10 10}) mt-env)
+        (boolT))
+  (test (typecheck (parse `true) mt-env)
+        (boolT))
+  (test (typecheck (parse `false) mt-env)
+        (boolT))
+  ;;-----------------------------------------------------
   (test (typecheck (parse '10) mt-env)
         (numT))
   (test (typecheck (parse '{+ 10 17}) mt-env)
