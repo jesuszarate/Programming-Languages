@@ -136,12 +136,12 @@
      (firstC (parse (second (s-exp->list s))))]
     [(s-exp-match? '{rest ANY} s)
      (restC (parse (second (s-exp->list s))))]
-    [(s-exp-match? '{ANY ANY} s)
-     (appC (parse (first (s-exp->list s)))
-           (parse (second (s-exp->list s))))]
-;    [(s-exp-match? '{ANY ANY ...} s)
+;    [(s-exp-match? '{ANY ANY} s)
 ;     (appC (parse (first (s-exp->list s)))
-;           (map parse (rest (s-exp->list s))))]
+;           (parse (second (s-exp->list s))))]
+    [(s-exp-match? '{ANY ANY ...} s)
+     (appC (parse (first (s-exp->list s)))
+           (map parse (rest (s-exp->list s))))]
     [else (error 'parse "invalid input")]))
 
 (define (parse-type [s : s-expression]) : Type
