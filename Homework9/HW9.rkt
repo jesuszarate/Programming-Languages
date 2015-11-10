@@ -45,7 +45,7 @@
   [numT]
   [boolT]
   [arrowT (arg : Type)
-          (result : Type)]
+          (result : Type)] ;; List of Type
   [pairT ( lhs : Type)
          ( rhs : Type)])
 
@@ -170,16 +170,16 @@
   (test (parse '{+ {* 3 4} 8})
         (plusC (multC (numC 3) (numC 4))
                (numC 8)))
-;  (test (parse '{let {[x : num {+ 1 2}]}
- ;                 y})
-  ;      (appC (lamC 'x (numT) (idC 'y))
-   ;           (plusC (numC 1) (numC 2))))
+  (test (parse '{let {[x : num {+ 1 2}]}
+                  y})
+        (appC (lamC (list 'x) (list (numT)) (idC 'y))
+              (plusC (numC 1) (numC 2))))
   (test (parse '{lambda {[x : num] [y : num]} 9})
         (lamC (list 'x 'y) (list (numT) (numT)) (numC 9)))
-;  (test (parse '{double 9})
-;        (appC (idC 'double) (numC 9)))
-;  (test/exn (parse '{{+ 1 2}})
-;            "invalid input")
+  (test (parse '{double 9})
+        (appC (idC 'double) (numC 9)))
+  (test/exn (parse '{{+ 1 2}})
+            "invalid input")
 
   (test (parse-type `num)
         (numT))
@@ -244,9 +244,9 @@
   (test (interp (parse '{+ {* 2 3} {+ 5 8}})
                 mt-env)
         (numV 19))
-;  (test (interp (parse '{lambda {[x : num]} {+ x x}})
-;                mt-env)
-;        (closV 'x (plusC (idC 'x) (idC 'x)) mt-env))
+  (test (interp (parse '{lambda {[x : num]} {+ x x}})
+                mt-env)
+        (closV (list 'x) (plusC (idC 'x) (idC 'x)) mt-env))
   (test (interp (parse '{let {[x : num 5]}
                           {+ x x}})
                 mt-env)
@@ -405,6 +405,8 @@
 
 (module+ test
 
+  
+  
   ;#|;;Part 2 — Pairs ---------------------------------------
   (test (interp (parse '{cons 10 8})
                 mt-env)
@@ -421,8 +423,8 @@
   
   ;(test (typecheck (parse '{cons 10 8})
    ;                mt-env)
-     ;   ;; Your constructor might be different than crossT:
-    ;    (crossT (numT) (numT)))
+    ;    ;; Your constructor might be different than crossT:
+     ;   (crossT (numT) (numT)))
   
   (test (typecheck (parse '{first {cons 10 8}})
                    mt-env)
