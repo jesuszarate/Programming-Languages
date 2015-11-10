@@ -21,14 +21,14 @@
 ;  [lamC (n : symbol)
 ;        (arg-type : Type)
 ;        (body : ExprC)]
-  [appC (fun : ExprC)
-        (arg : ExprC)]
+  ;[appC (fun : ExprC)
+   ;     (arg : ExprC)]
    
   [lamC (n : (listof symbol))
         (arg-type : (listof Type))
         (body : ExprC)]
-  ;[appC (fun : ExprC)
-   ;     (arg : (listof ExprC))]
+  [appC (fun : ExprC)
+        (arg : (listof ExprC))]
   [boolC (t : boolean)]
   [equalC (lhs : ExprC)
           (rhs : ExprC)]
@@ -90,7 +90,7 @@
        (appC (lamC (list (s-exp->symbol (first bs)))
                     (list (parse-type (third bs)))
                    (parse (third (s-exp->list s))))
-             (parse (fourth bs))))]
+             (list (parse (fourth bs)))))]
 
    ; [(s-exp-match? '{lambda {SYMBOL ...} ANY ...} s)
     ; (lamC (map s-exp->symbol (s-exp->list 
@@ -136,12 +136,12 @@
      (firstC (parse (second (s-exp->list s))))]
     [(s-exp-match? '{rest ANY} s)
      (restC (parse (second (s-exp->list s))))]
-    [(s-exp-match? '{ANY ANY} s)
+    ;[(s-exp-match? '{ANY ANY} s)
+     ;(appC (parse (first (s-exp->list s)))
+      ;     (parse (second (s-exp->list s))))]
+    [(s-exp-match? '{ANY ANY ...} s)
      (appC (parse (first (s-exp->list s)))
-           (parse (second (s-exp->list s))))]
-;    [(s-exp-match? '{ANY ANY ...} s)
-;     (appC (parse (first (s-exp->list s)))
-;           (map parse (rest (s-exp->list s))))]
+           (map parse (rest (s-exp->list s))))]
     [else (error 'parse "invalid input")]))
 
 (define (parse-type [s : s-expression]) : Type
@@ -173,13 +173,13 @@
   (test (parse '{let {[x : num {+ 1 2}]}
                   y})
         (appC (lamC (list 'x) (list (numT)) (idC 'y))
-              (plusC (numC 1) (numC 2))))
+              (list (plusC (numC 1) (numC 2)))))
   (test (parse '{lambda {[x : num] [y : num]} 9})
         (lamC (list 'x 'y) (list (numT) (numT)) (numC 9)))
   (test (parse '{double 9})
-        (appC (idC 'double) (numC 9)))
-  (test/exn (parse '{{+ 1 2}})
-            "invalid input")
+        (appC (idC 'double) (list (numC 9))))
+  ;(test/exn (parse '{{+ 1 2}})
+   ;         "invalid input")
 
   (test (parse-type `num)
         (numT))
@@ -208,14 +208,16 @@
                      (interp r env))]         
     [lamC (n t body)
           (closV n body env)]
-    [appC (fun arg) (type-case Value (interp fun env)
-                      [closV (n body c-env)
-                             (interp body
-                                     (extend-env
-                                      (bind (first n)
-                                            (interp arg env))
-                                      c-env))]
-                      [else (error 'interp "not a function")])]
+    [appC (fun args)
+          (type-case Value (interp fun env)
+            [closV (ns body c-env)
+                   (if (= (length args) (length ns))
+                       (interp body
+                               (extend*-env
+                                (map2 bind ns (evaluate-args args empty env))
+                                c-env))                               
+                       (error 'interp "wrong arity"))]
+            [else (error 'interp "not a function")])]
     
     [consC (l r) (consV (interp l env)
                         (interp r env))]
@@ -225,8 +227,52 @@
     [restC (a) (consV-r (interp a env))])) ; Check for erro in typecheck
 
 
+;; extend*-env ----------------------------------------
+(define (extend*-env [l : (listof Binding)] [env : Env]) : Env
+  (cond
+   [(empty? l) env]
+   [else (extend-env (first l)
+                     (extend*-env (rest l) env))]))
+
+;; evaluate-args ----------------------------------------
+(define (evaluate-args [l : (listof ExprC)] [result : (listof Value)] [env : Env]) : (listof Value)
+  (cond
+    [(empty? l) (reverse result)]
+    [else
+     (evaluate-args (rest l) (cons (interp (first l) env) result) env)]))
+
+(module+ test
+  (test (evaluate-args (list (numC 1) (numC 2)) empty mt-env)
+        (list (numV 1) (numV 2))))
+
+
+
 (module+ test
 
+  (test (interp (parse '{{lambda {}
+                           10}})
+                mt-env)
+        (numV 10))
+  
+  (test (interp (parse '{{lambda {[x : num] [y : num]} {+ x y}}
+                         10
+                         20})
+                mt-env)
+        (numV 30))
+  
+  
+  (test (typecheck (parse '{{lambda {[x : num] [y : bool]} y}
+                            10
+                            false})
+                   mt-env)
+        (boolT))
+  
+  (test/exn (typecheck (parse '{{lambda {[x : num] [y : bool]} y}
+                                false
+                                10})
+                       mt-env)
+            "no type")
+  ;;----------------------------------------------------
   (test (interp (parse '{= 10 10}) mt-env)
         (boolV true))
   ;;----------------------------------------------------
@@ -352,7 +398,7 @@
           (type-case Type (typecheck fun tenv)
             [arrowT (arg-type result-type)
                     (if (equal? arg-type
-                                (typecheck arg tenv))
+                                (typecheck (first arg) tenv)) ; TODO: Not good fix, fix it
                         result-type
                         (type-error arg
                                     (to-string arg-type)))]
