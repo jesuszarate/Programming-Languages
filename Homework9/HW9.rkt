@@ -220,7 +220,8 @@
 
 (module+ test
   
-  
+  (test (interp (parse `true) mt-env)
+        (boolV true))
   ;;----------------------------------------------------
   (test (interp (parse '{= 10 10}) mt-env)
         (boolV true))
@@ -418,7 +419,7 @@
   (make-lookup tbind-name tbind-type))
 
 (module+ test
-  
+
   (test (typecheck (parse '{lambda {[x : bool] [y : bool]} x}) mt-env)
         (arrowT (list (boolT) (boolT)) (boolT)))
   (test (typecheck (parse '{lambda {[x : num] [y : num] [z : bool]} {+ x y}}) mt-env)
@@ -426,6 +427,7 @@
   (test (typecheck (parse '{lambda {[x : num] [y : num] [z : bool]} {if {= {+ x y} 1} true z}}) mt-env)
         (arrowT (list (numT) (numT) (boolT)) (boolT)))
   
+
   ;;--------
   (test (interp (parse '{{lambda {}
                            10}})
@@ -437,7 +439,11 @@
                          20})
                 mt-env)
         (numV 30))
-  
+  (test/exn (interp (parse '{{lambda {[x : num] [y : num]} {+ x y}}
+                         10})
+                         
+                mt-env)
+        "wrong arity")
   
   (test (typecheck (parse '{{lambda {[x : num] [y : bool]} y}
                             10
