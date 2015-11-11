@@ -330,7 +330,7 @@
     [multC (l r) (typecheck-nums l r tenv)]
     [equalC (l r) (typecheck-nums-bools l r tenv)]
     [ifC (tst thn els)
-         (type-case Type (typecheck-bool tst tenv)
+         (type-case Type (typecheck tst tenv)
            [boolT ()
                   (local [(define t (typecheck thn tenv))
                           (define e (typecheck els tenv))]
@@ -351,8 +351,7 @@
                     (if (cmp-types args-types args tenv)
                         result-type
                         (type-error (first args)
-                                    (to-string args-types)))]
-            
+                                    (to-string args-types)))]            
             [else (type-error fun "function")])]
     
     [consC (lhs rhs) (pairT (typecheck lhs tenv) (typecheck rhs tenv))]
@@ -364,13 +363,13 @@
                  [else (type-error e (to-string e))])]))
 
 (define (cmp-types [args-types : (listof Type)] [args : (listof ExprC)] [tenv : TypeEnv]) : boolean
-  (if (equal? (length args-types) (length args-types))
+  (if (equal? (length args-types) (length args))
       (cond
         [(empty? args-types) #t]
         [else (if (equal? (first args-types) (typecheck (first args) tenv))
                   (cmp-types (rest args-types) (rest args) tenv)
                   #f)])
-      #f)
+      (error 'typecheck "wrong arity"))
   )
 
 ;; extendt*-env ----------------------------------------
@@ -379,12 +378,6 @@
     [(empty? l) env]
     [else (extend-env (first l)
                       (extendt*-env (rest l) env))]))
-
-
-(define (typecheck-bool tst tenv)
-  (type-case Type (typecheck tst tenv)
-    [boolT () (boolT)]
-    [else (type-error tst "bool")]))
 
 (define (typecheck-nums l r tenv)
   (type-case Type (typecheck l tenv)
@@ -426,8 +419,16 @@
         (arrowT (list (numT) (numT) (boolT)) (numT)))
   (test (typecheck (parse '{lambda {[x : num] [y : num] [z : bool]} {if {= {+ x y} 1} true z}}) mt-env)
         (arrowT (list (numT) (numT) (boolT)) (boolT)))
-  
-
+  (test (typecheck (parse '{if {= true true} true false}) mt-env)
+                 (boolT))
+  (test/exn (typecheck (parse '{if {+ 1 2} true false}) mt-env)
+                   "no type")
+  (test/exn (typecheck (parse '{if {= true 1} true false}) mt-env)
+                 "bool")
+  (test/exn (typecheck (parse '{if {= 1 true} true false}) mt-env)
+                 "num")
+  (test/exn (typecheck (parse '{if {= {lambda {[x : num]} 5} true} true false}) mt-env)
+                 "num")
   ;;--------
   (test (interp (parse '{{lambda {}
                            10}})
@@ -450,6 +451,13 @@
                             false})
                    mt-env)
         (boolT))
+  
+  (test/exn (typecheck (parse '{{lambda {[x : num] [y : bool]} y}
+                            10                           
+                            false
+                            10})
+                   mt-env)
+        "wrong arity")
   
   (test/exn (typecheck (parse '{{lambda {[x : num] [y : bool]} y}
                                 false
@@ -477,6 +485,10 @@
   (test (typecheck (parse '{+ 1 {rest {cons 10 8}}})
                    mt-env)
         (numT))
+  
+  (test/exn (typecheck (parse '{+ 1 {rest 10}})
+                   mt-env)
+        "no type")
   
   (test (typecheck (parse '{{lambda {[x : (num * bool)]}
                               {first x}}
@@ -528,6 +540,9 @@
   (test/exn (typecheck (parse '{+ 1 {if true true false}})
                        mt-env)
             "no type")
+  (test/exn (typecheck (parse '{if 1 true false})
+                       mt-env)
+            "bool")
   ;;-----------------------------------------------------
   (test (typecheck (parse '{= 10 10}) mt-env)
         (boolT))
