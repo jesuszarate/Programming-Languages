@@ -44,7 +44,7 @@
 (define-type Type
   [numT]
   [boolT]
-  [arrowT (arg : Type)
+  [arrowT (arg : (listof Type))
           (result : Type)] ;; List of Type
   [pairT ( lhs : Type)
          ( rhs : Type)])
@@ -150,9 +150,12 @@
     (numT)]
    [(s-exp-match? `bool s)
     (boolT)]   
-   [(s-exp-match? `(ANY -> ANY) s)
-    (arrowT (parse-type (first (s-exp->list s)))
-            (parse-type (third (s-exp->list s))))]
+   [(s-exp-match? `(ANY ... -> ANY) s)
+    (arrowT (map parse-type (reverse (rest (rest (reverse (s-exp->list s))))))
+            (parse-type (first(reverse (s-exp->list s)))))]
+    
+    ;(arrowT (parse-type (first (s-exp->list s)))
+     ;       (map parse-type (rest (rest (s-exp->list s)))))]
    [(s-exp-match? `(ANY * ANY) s)
     (pairT (parse-type (first (s-exp->list s)))
            (parse-type (third (s-exp->list s))))]
@@ -186,7 +189,7 @@
   (test (parse-type `bool)
         (boolT))
   (test (parse-type `(num -> bool))
-        (arrowT (numT) (boolT)))
+        (arrowT (list (numT)) (boolT)))
   (test (parse-type `(num * bool))
         (pairT (numT) (boolT)))
   (test/exn (parse-type '1)
@@ -249,29 +252,7 @@
 
 (module+ test
 
-  (test (interp (parse '{{lambda {}
-                           10}})
-                mt-env)
-        (numV 10))
   
-  (test (interp (parse '{{lambda {[x : num] [y : num]} {+ x y}}
-                         10
-                         20})
-                mt-env)
-        (numV 30))
-  
-  
-  (test (typecheck (parse '{{lambda {[x : num] [y : bool]} y}
-                            10
-                            false})
-                   mt-env)
-        (boolT))
-  
-  (test/exn (typecheck (parse '{{lambda {[x : num] [y : bool]} y}
-                                false
-                                10})
-                       mt-env)
-            "no type")
   ;;----------------------------------------------------
   (test (interp (parse '{= 10 10}) mt-env)
         (boolV true))
@@ -389,20 +370,37 @@
                         (type-error t "no type")))]
            [else (type-error tst "bool")])]
     [idC (n) (type-lookup n tenv)]
-    [lamC (n arg-type body)
-          (arrowT (first arg-type)
-                  (typecheck body 
-                             (extend-env (tbind (first n) (first arg-type))
-                                         tenv)))]
-    [appC (fun arg)
+    [lamC (n args-type body) 
+          (arrowT args-type
+                  (typecheck body ; make a function that will typecheck on each type in the ars-type
+                             (extendt*-env
+                              (map2 tbind n args-type)
+                              tenv)))]
+                             ;(extend-env (tbind (first n) (first args-type))
+                              ;           tenv)))]
+    ;(bad
+     ;(typecheck (parse '((lambda ((x : num) (y : bool)) y) false 10)) mt-env)
+     ;(boolT) "no type" "at line 451")
+
+    [appC (fun args) 
           (type-case Type (typecheck fun tenv)
-            [arrowT (arg-type result-type)
-                    (if (equal? arg-type
-                                (typecheck (first arg) tenv)) ; TODO: Not good fix, fix it
+            [arrowT (args-types result-type)
+                    (if (cmp-types args-types args tenv)
                         result-type
-                        (type-error arg
-                                    (to-string arg-type)))]
+                        (type-error (first args)
+                                    (to-string args-types)))]
+
+                    
+                    ;(boolT)]
+            
+;                    (if (equal? arg-type
+;                                (typecheck (first args) tenv)) ; TODO: Not good fix, fix it
+;                        ;result-type
+;                        (list (boolT))
+;                        (type-error (first args)
+;                                    (to-string arg-type)))]
             [else (type-error fun "function")])]
+    
     [consC (lhs rhs) (pairT (typecheck lhs tenv) (typecheck rhs tenv))]
     [firstC (e) (type-case Type (typecheck e tenv)
                   [pairT (f r) f]
@@ -410,7 +408,24 @@
     [restC (e) (type-case Type (typecheck e tenv)
                  [pairT (f r) r]
                  [else (type-error e (to-string e))])]))
-    
+
+(define (cmp-types [args-types : (listof Type)] [args : (listof ExprC)] [tenv : TypeEnv]) : boolean
+  (if (equal? (length args-types) (length args-types))
+      (cond
+        [(empty? args-types) #t]
+        [else (if (equal? (first args-types) (typecheck (first args) tenv))
+                  (cmp-types (rest args-types) (rest args) tenv)
+                  #f)])
+      #f)
+  )
+
+;; extendt*-env ----------------------------------------
+(define (extendt*-env [l : (listof TypeBinding)] [env : TypeEnv]) : TypeEnv
+  (cond
+   [(empty? l) env]
+   [else (extend-env (first l)
+                     (extendt*-env (rest l) env))]))
+
 
 (define (typecheck-bool tst tenv)
   (type-case Type (typecheck tst tenv)
@@ -451,7 +466,37 @@
 
 (module+ test
 
+  (test (typecheck (parse '{lambda {[x : bool] [y : bool]} x}) mt-env)
+        (arrowT (list (boolT) (boolT)) (boolT)))
+  (test (typecheck (parse '{lambda {[x : num] [y : num] [z : bool]} {+ x y}}) mt-env)
+        (arrowT (list (numT) (numT) (boolT)) (numT)))
+  (test (typecheck (parse '{lambda {[x : num] [y : num] [z : bool]} {if {= {+ x y} 1} true z}}) mt-env)
+        (arrowT (list (numT) (numT) (boolT)) (boolT)))
   
+  ;;--------
+  (test (interp (parse '{{lambda {}
+                           10}})
+                mt-env)
+        (numV 10))
+  
+  (test (interp (parse '{{lambda {[x : num] [y : num]} {+ x y}}
+                         10
+                         20})
+                mt-env)
+        (numV 30))
+  
+  
+  (test (typecheck (parse '{{lambda {[x : num] [y : bool]} y}
+                            10
+                            false})
+                   mt-env)
+        (boolT))
+  
+  (test/exn (typecheck (parse '{{lambda {[x : num] [y : bool]} y}
+                                false
+                                10})
+                       mt-env)
+            "no type")
   
   ;#|;;Part 2 — Pairs ---------------------------------------
   (test (interp (parse '{cons 10 8})
@@ -467,11 +512,6 @@
                 mt-env)
         (numV 8))
   
-  ;(test (typecheck (parse '{cons 10 8})
-   ;                mt-env)
-    ;    ;; Your constructor might be different than crossT:
-     ;   (crossT (numT) (numT)))
-  
   (test (typecheck (parse '{first {cons 10 8}})
                    mt-env)
         (numT))
@@ -479,12 +519,6 @@
   (test (typecheck (parse '{+ 1 {rest {cons 10 8}}})
                    mt-env)
         (numT))
-  
-  ;(test (typecheck (parse '{lambda {[x : (num * bool)]}
-   ;                          {first x}})
-    ;               mt-env)
-     ;   ;; Your constructor might be different than crossT:
-      ;  (arrowT (crossT (numT) (boolT)) (numT)))
   
   (test (typecheck (parse '{{lambda {[x : (num * bool)]}
                               {first x}}
@@ -551,9 +585,9 @@
   (test (typecheck (parse '{* 10 17}) mt-env)
         (numT))
   (test (typecheck (parse '{lambda {[x : num]} 12}) mt-env)
-        (arrowT (numT) (numT)))
+        (arrowT (list (numT)) (numT)))
   (test (typecheck (parse '{lambda {[x : num]} {lambda {[y : bool]} x}}) mt-env)
-        (arrowT (numT) (arrowT (boolT)  (numT))))
+        (arrowT (list (numT)) (arrowT (list (boolT)) (numT))))
 
   (test (typecheck (parse '{{lambda {[x : num]} 12}
                             {+ 1 17}})
