@@ -136,6 +136,8 @@
         (idC 'x))
   (test (parse '{+ 2 1})
         (plusC (numC 2) (numC 1)))
+  (test/exn (parse '{})
+            "invalid input")
   (test (parse '{* 3 4})
         (multC (numC 3) (numC 4)))
   (test (parse '{+ {* 3 4} 8})
@@ -159,6 +161,7 @@
         (pairT (numT) (boolT)))
   (test/exn (parse-type '1)
             "invalid input"))
+ 
 
 ;; interp ----------------------------------------
 (define (interp [a : ExprC] [env : Env]) : Value
