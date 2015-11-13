@@ -170,19 +170,37 @@
     [emptyC () (listV empty)]
     [consC (l r) (let ([v-l (interp l env)]
                        [v-r (interp r env)])
+                   ;(listV (cons v-l (listV-elems v-r))))]
                    (type-case Value v-r
                      [listV (elems) (listV (cons v-l elems))]
                      [else (error 'interp "not a list")]))]
-    [firstC (a) (type-case Value (interp a env)
-                  [listV (elems) (if (empty? elems)
-                                     (error 'interp "list is empty")
-                                     (first elems))]
-                  [else (error 'interp "not a list")])]
-    [restC (a) (type-case Value (interp a env)
-                 [listV (elems) (if (empty? elems)
-                                     (error 'interp "list is empty")
-                                     (listV (rest elems)))]
-                 [else (error 'interp "not a list")])]))
+    
+    [firstC (a)
+            (local ([define elems (listV-elems (interp a env))])
+              (if (empty? elems)
+                  (error 'interp "list is empty")
+                  (first elems)))]
+;            (type-case Value (interp a env)
+;                  [listV (elems) (if (empty? elems)
+;                                     (error 'interp "list is empty")
+;                                     (first elems))]
+;                  [else (error 'interp "not a list")])]
+    [restC (a)
+           (local [(define elems (listV-elems (interp a env)))]
+             (if (empty? elems)
+                 (error 'interp "list is empty")
+                 (listV (rest elems))))]))
+                 ;[else (error 'interp "not a list")])]))
+
+;           (local ([define elems (listV-elems (interp a env))])
+ ;            (if (empty? elems)
+  ;               (error 'interp "list is empty")
+   ;              (listV (rest elems))))]))
+;           (type-case Value (interp a env)
+;                 [listV (elems) (if (empty? elems)
+;                                     (error 'interp "list is empty")
+;                                     (listV (rest elems)))]
+;                 [else (error 'interp "not a list")])]))
 
 (module+ test
   (test (interp (parse '2) mt-env)
@@ -234,12 +252,12 @@
   (test/exn (interp (parse '{cons 1 2})
                     mt-env)
             "not a list")
-  (test/exn (interp (parse '{first 1})
-                    mt-env)
-            "not a list")
-  (test/exn (interp (parse '{rest 1})
-                    mt-env)
-            "not a list")
+  ;(test/exn (interp (parse '{first 1})
+   ;                 mt-env)
+    ;        "not a list")
+  ;(test/exn (interp (parse '{rest 1})
+   ;                 mt-env)
+    ;        "not a list")
   (test/exn (interp (parse '{first empty})
                     mt-env)
             "list is empty")
@@ -324,9 +342,20 @@
               result-type))]
     ;; These are all wrong:
     [emptyC () (listofT (boolT))]
-    [consC (l r) (listofT (boolT))]
-    [firstC (a) (boolT)]
-    [restC (a) (listofT (boolT))]))
+    [consC (l r)           
+               (listofT (boolT))]
+    [firstC (a) (local [(define result-type (varT (box (none))))]
+                  (begin
+                    (unify! (listofT result-type)
+                            (typecheck a tenv)
+                            a)
+                  result-type))]
+    [restC (a) (local [(define result-type (varT (box (none))))]
+                 (begin
+                   (unify! (listofT result-type)
+                           (typecheck a tenv)
+                           a)
+                   result-type))]))
 
 (define (typecheck-nums l r tenv)
   (begin
@@ -409,7 +438,10 @@
                                    (unify! b1 b2 expr))]
                          [else (type-error expr t1 t2)])]
        ;; This is wrong:
-       [listofT (e2) (type-error expr t1 t2)])]))
+       [listofT (e2) (type-case Type t1
+                       [listofT (e1) 
+                                (unify! e1 e2 expr)]
+                       [else (type-error expr t1 t2)])])]))
 
 (define (resolve [t : Type]) : Type
   (type-case Type t
@@ -446,7 +478,66 @@
                          " vs. "
                          (to-string t2))))))))
 
+(define (run-prog [s : s-expression]) : s-expression
+  (local [(define p (parse s))]
+    (type-case Type (typecheck p mt-env)
+      [numT () (run-interp p)]
+      [boolT () (run-interp p)]
+      [arrowT (arg result) (run-interp p)]            
+      [varT (is) (run-interp p)]
+      [listofT (elem) (run-interp p)])))
+
+(define (run-interp [e : ExprC]) : s-expression
+  (type-case Value (interp e mt-env)
+        [numV (n) (number->s-exp n)]
+        [closV (arg bod env) `function]
+        [listV (elems) `list]))
+
 (module+ test
+
+(test (run-prog '1)
+        '1)
+  
+  (test (run-prog `empty)
+        `list)
+  
+  (test (run-prog '{cons 1 empty})
+        `list)
+  (test (run-prog '{cons empty empty})
+        `list)
+  (test/exn (run-prog '{cons 1 {cons empty empty}})
+            "no type")
+  
+  (test/exn (run-prog '{first 1})
+            "no type")
+  (test/exn (run-prog '{rest 1})
+            "no type")
+  
+  (test/exn (run-prog '{first empty})
+            "list is empty")
+  (test/exn (run-prog '{rest empty})
+            "list is empty")
+  
+  (test (run-prog '{let {[f : ?
+                            {lambda {[x : ?]} {first x}}]}
+                     {+ {f {cons 1 empty}} 3}})
+        '4)
+  (test (run-prog '{let {[f : ?
+                            {lambda {[x : ?]}
+                              {lambda {[y : ?]}
+                                {cons x y}}}]}
+                     {first {rest {{f 1} {cons 2 empty}}}}})
+        '2)
+  
+  (test/exn (run-prog '{lambda {[x : ?]}
+                         {cons x x}})
+            "no type")
+  
+  (test/exn (run-prog '{let {[f : ? {lambda {[x : ?]} x}]}
+                         {cons {f 1} {f empty}}})
+            "no type")
+
+;;_____________________________________________  
   (define a-type-var (varT (box (none))))
   (define an-expr (numC 0))
   
