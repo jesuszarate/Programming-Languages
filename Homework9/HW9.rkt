@@ -85,10 +85,12 @@
                    (list (parse-type (third bs)))
                    (parse (third (s-exp->list s))))
              (list (parse (fourth bs)))))]           
+
     [(s-exp-match? '{lambda {[SYMBOL : ANY] ...} ANY ...} s)
      (let ([arg
             (s-exp->list 
              (second (s-exp->list s)))])
+       
        (let ([symbols (map                    
                        (lambda (x) (s-exp->symbol (first (s-exp->list x))))
                        arg)])
@@ -99,6 +101,8 @@
             symbols
             types    
             (parse (third (s-exp->list s)))))))]
+
+    
     [(s-exp-match? '{if ANY ANY ANY} s)
      (ifC (parse (second (s-exp->list s)))
           (parse (third (s-exp->list s)))
