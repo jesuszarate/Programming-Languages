@@ -341,9 +341,17 @@
                       fun)
               result-type))]
     ;; These are all wrong:
-    [emptyC () (listofT (boolT))]
-    [consC (l r)           
-               (listofT (boolT))]
+    [emptyC ()
+            (listofT (varT (box (none))))]
+    [consC (l r)
+           (let ([v-l (typecheck l tenv)]
+                 [v-r (typecheck r tenv)])
+             (begin
+               (unify! v-r                
+                       v-l
+                       l)
+               (listofT v-l)))]               
+
     [firstC (a) (local [(define result-type (varT (box (none))))]
                   (begin
                     (unify! (listofT result-type)
@@ -463,7 +471,9 @@
                      [none () false]
                      [some (t2) (occurs? r t2)]))]
     ;; This is wrong:
-    [listofT (e) false]))
+    [listofT (e)             
+             (occurs? r e)]))
+             
 
 (define (type-error [a : ExprC] [t1 : Type] [t2 : Type])
   (error 'typecheck (string-append
