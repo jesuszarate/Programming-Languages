@@ -347,17 +347,18 @@
            (let ([v-l (typecheck l tenv)]
                  [v-r (typecheck r tenv)])
              (begin
-               (unify! v-r                
-                       v-l
+               (unify! v-l                
+                       v-r
                        l)
                (listofT v-l)))]               
 
     [firstC (a) (local [(define result-type (varT (box (none))))]
-                  (begin
-                    (unify! (listofT result-type)
-                            (typecheck a tenv)
-                            a)
-                  result-type))]
+                  (let ([a-elem (typecheck a tenv)])
+                    (begin
+                      (unify! result-type
+                              (typecheck a tenv)
+                              a)
+                      (listofT-elem a-elem))))]
     [restC (a) (local [(define result-type (varT (box (none))))]
                  (begin
                    (unify! (listofT result-type)
@@ -446,10 +447,12 @@
                                    (unify! b1 b2 expr))]
                          [else (type-error expr t1 t2)])]
        ;; This is wrong:
-       [listofT (e2) (type-case Type t1
-                       [listofT (e1) 
-                                (unify! e1 e2 expr)]
-                       [else (type-error expr t1 t2)])])]))
+       [listofT (e2) (unify! e2 t1 expr)
+;                (type-case Type e2                       
+;                       [varT (s2)
+;                             (unify! e2 t1 expr)]
+;                       [else (type-error expr t1 t2)])
+                ])]))
 
 (define (resolve [t : Type]) : Type
   (type-case Type t
@@ -505,7 +508,17 @@
 
 (module+ test
 
-(test (run-prog '1)
+  (test (typecheck (parse '{cons 1 {cons 2 empty}}) mt-env)
+        (listofT (numT)))
+  
+  (test (typecheck (parse '{first {cons 1 empty}}) mt-env)
+        (numT))
+  
+  (test (run-prog '{first {cons 1 empty}})
+        '1)
+   (test (run-prog '{+ 1 {first {cons 1 empty}}})
+        '2)
+  (test (run-prog '1)
         '1)
   
   (test (run-prog `empty)
