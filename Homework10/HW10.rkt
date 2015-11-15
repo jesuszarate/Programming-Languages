@@ -31,8 +31,7 @@
   [boolT]
   [arrowT (arg : Type)
           (result : Type)]
-  [varT (is : (boxof (optionof Type)))]
-  [L-varT (is : (boxof (optionof Type)))]
+  [varT (is : (boxof (optionof Type)))]  
   [listofT (elem : Type)])
 
 (define-type Binding
@@ -348,24 +347,22 @@
            (let ([v-l (typecheck l tenv)]
                  [v-r (typecheck r tenv)])
              (begin
-               (unify! v-l                
-                       v-r
-                       l)
-               (listofT v-l)))]               
-
-    [firstC (a) (local [(define result-type (L-varT (box (none))))]
-                  (let ([a-elem (typecheck a tenv)])
+               (unify! (listofT v-l)  v-r l)
+               v-r))]
+    
+    [firstC (a) (local [(define result-type (varT (box (none))))]                  
                     (begin
-                      (unify! result-type
+                      (unify! (listofT result-type)
                               (typecheck a tenv)
                               a)
-                      (listofT-elem a-elem))))]
+                      result-type))]
+    
     [restC (a) (local [(define result-type (varT (box (none))))]
                  (begin
                    (unify! (listofT result-type)
                            (typecheck a tenv)
                            a)
-                   result-type))]))
+                   (listofT result-type)))]))
 
 (define (typecheck-nums l r tenv)
   (begin
@@ -431,19 +428,7 @@
                             (type-error expr t1 t3)
                             (begin
                               (set-box! is1 (some t3))
-                              (values)))))])]
-    [L-varT (is1)
-          (type-case (optionof Type) (unbox is1)
-            [some (t3) (unify! t3 t2 expr)]
-            [none ()
-                  (local [(define t3 (resolve t2))]
-                    (if (eq? t1 t3)
-                        (values)
-                        (if (occurs? t1 t3)
-                            (type-error expr t1 t3)
-                            (begin
-                              (set-box! is1 (some t3))
-                              (values)))))])]
+                              (values)))))])]    
     [else
      (type-case Type t2
        [varT (is2) (unify! t2 t1 expr)]
@@ -458,15 +443,13 @@
                                  (begin
                                    (unify! a1 a2 expr)
                                    (unify! b1 b2 expr))]
-                         [else (type-error expr t1 t2)])]
-       ;; This is wrong:
-       [listofT (e2) (unify! e2 t1 expr)
-;                (type-case Type e2                       
-;                       [varT (s2)
-;                             (unify! e2 t1 expr)]
-;                       [else (type-error expr t1 t2)])
-                ]
-       [L-varT (is2) (unify! t2 t1 expr)])]))
+                         [else (type-error expr t1 t2)])]       
+       [listofT (e2)
+                (type-case Type t1                      
+                       [listofT (e1)
+                             (unify! e1 e2 expr)]
+                       [else (type-error expr t1 t2)])
+                ])]))       
 
 (define (resolve [t : Type]) : Type
   (type-case Type t
@@ -487,13 +470,8 @@
                    (type-case (optionof Type) (unbox is)
                      [none () false]
                      [some (t2) (occurs? r t2)]))]
-    ;; This is wrong:
     [listofT (e)             
-             (occurs? r e)]
-    [L-varT (is) (or (eq? r t) ; eq? checks for the same box
-                   (type-case (optionof Type) (unbox is)
-                     [none () false]
-                     [some (t2) (occurs? r t2)]))]))
+             (occurs? r e)]))    
              
 
 (define (type-error [a : ExprC] [t1 : Type] [t2 : Type])
@@ -516,9 +494,7 @@
       [boolT () (run-interp p)]
       [arrowT (arg result) (run-interp p)]            
       [varT (is) (run-interp p)]
-      [listofT (elem) (run-interp p)]
-      [L-varT (is) (run-interp p)])
-    ))
+      [listofT (elem) (run-interp p)])))
 
 (define (run-interp [e : ExprC]) : s-expression
   (type-case Value (interp e mt-env)
@@ -526,18 +502,8 @@
         [closV (arg bod env) `function]
         [listV (elems) `list]))
 
-(module+ test
+(module+ test 
 
-  (test (typecheck (parse '{cons 1 {cons 2 empty}}) mt-env)
-        (listofT (numT)))
-  
-  (test (typecheck (parse '{first {cons 1 empty}}) mt-env)
-        (numT))
-  
-  (test (run-prog '{first {cons 1 empty}})
-        '1)
-   (test (run-prog '{+ 1 {first {cons 1 empty}}})
-        '2)
   (test (run-prog '1)
         '1)
   
@@ -579,6 +545,82 @@
   (test/exn (run-prog '{let {[f : ? {lambda {[x : ?]} x}]}
                          {cons {f 1} {f empty}}})
             "no type")
+  ;(test/exn (run-prog '{lambda {[x : ?]}
+   ;                      {cons x 1}})
+    ;        "no type")
+  
+  ;(test (run-prog '{{lambda {[x : ?]} x} 2})
+   ;         `function)
+  
+  ;(test (run-prog '{let {[f : ?
+   ;                         {lambda {[x : ?]} {first x}}]}
+    ;                 {f {cons 1 empty}}})
+     ;   '1)
+;  (test (run-prog '{let {[f : ?
+;                            {lambda {[x : ?]} {first x}}]}
+;                     {f {cons 1 empty}}})
+;        '1)
+;  
+;  (test (run-prog '{lambda {[x : ?]}
+;                         {cons 1 x}})
+;            `function)  
+;
+;  (test (run-prog '{let {[f : ?
+;                            {lambda {[x : ?]} {cons 1 x}}]}
+;                     {f {cons 2 empty}}})
+;        `list)
+;  
+;  (test (typecheck (parse '{cons 1 {cons 2 empty}}) mt-env)
+;        (listofT (numT)))
+;  
+;  (test (typecheck (parse '{first {cons 1 empty}}) mt-env)
+;        (numT))
+;  
+;  (test (run-prog '{first {cons 1 empty}})
+;        '1)
+;   (test (run-prog '{+ 1 {first {cons 1 empty}}})
+;        '2)
+;  (test (run-prog '1)
+;        '1)
+;  
+;  (test (run-prog `empty)
+;        `list)
+;  
+;  (test (run-prog '{cons 1 empty})
+;        `list)
+;  (test (run-prog '{cons empty empty})
+;        `list)
+;  (test/exn (run-prog '{cons 1 {cons empty empty}})
+;            "no type")
+;  
+;  (test/exn (run-prog '{first 1})
+;            "no type")
+;  (test/exn (run-prog '{rest 1})
+;            "no type")
+;  
+;  (test/exn (run-prog '{first empty})
+;            "list is empty")
+;  (test/exn (run-prog '{rest empty})
+;            "list is empty")
+;  
+;  (test (run-prog '{let {[f : ?
+;                            {lambda {[x : ?]} {first x}}]}
+;                     {+ {f {cons 1 empty}} 3}})
+;        '4)
+;  (test (run-prog '{let {[f : ?
+;                            {lambda {[x : ?]}
+;                              {lambda {[y : ?]}
+;                                {cons x y}}}]}
+;                     {first {rest {{f 1} {cons 2 empty}}}}})
+;        '2)
+;  
+;  (test/exn (run-prog '{lambda {[x : ?]}
+;                         {cons x x}})
+;            "no type")
+;  
+;  (test/exn (run-prog '{let {[f : ? {lambda {[x : ?]} x}]}
+;                         {cons {f 1} {f empty}}})
+;            "no type")
 
 ;;_____________________________________________  
   (define a-type-var (varT (box (none))))
