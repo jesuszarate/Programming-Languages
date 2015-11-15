@@ -32,6 +32,7 @@
   [arrowT (arg : Type)
           (result : Type)]
   [varT (is : (boxof (optionof Type)))]
+  [L-varT (is : (boxof (optionof Type)))]
   [listofT (elem : Type)])
 
 (define-type Binding
@@ -352,7 +353,7 @@
                        l)
                (listofT v-l)))]               
 
-    [firstC (a) (local [(define result-type (varT (box (none))))]
+    [firstC (a) (local [(define result-type (L-varT (box (none))))]
                   (let ([a-elem (typecheck a tenv)])
                     (begin
                       (unify! result-type
@@ -431,6 +432,18 @@
                             (begin
                               (set-box! is1 (some t3))
                               (values)))))])]
+    [L-varT (is1)
+          (type-case (optionof Type) (unbox is1)
+            [some (t3) (unify! t3 t2 expr)]
+            [none ()
+                  (local [(define t3 (resolve t2))]
+                    (if (eq? t1 t3)
+                        (values)
+                        (if (occurs? t1 t3)
+                            (type-error expr t1 t3)
+                            (begin
+                              (set-box! is1 (some t3))
+                              (values)))))])]
     [else
      (type-case Type t2
        [varT (is2) (unify! t2 t1 expr)]
@@ -452,7 +465,8 @@
 ;                       [varT (s2)
 ;                             (unify! e2 t1 expr)]
 ;                       [else (type-error expr t1 t2)])
-                ])]))
+                ]
+       [L-varT (is2) (unify! t2 t1 expr)])]))
 
 (define (resolve [t : Type]) : Type
   (type-case Type t
@@ -475,7 +489,11 @@
                      [some (t2) (occurs? r t2)]))]
     ;; This is wrong:
     [listofT (e)             
-             (occurs? r e)]))
+             (occurs? r e)]
+    [L-varT (is) (or (eq? r t) ; eq? checks for the same box
+                   (type-case (optionof Type) (unbox is)
+                     [none () false]
+                     [some (t2) (occurs? r t2)]))]))
              
 
 (define (type-error [a : ExprC] [t1 : Type] [t2 : Type])
@@ -498,7 +516,9 @@
       [boolT () (run-interp p)]
       [arrowT (arg result) (run-interp p)]            
       [varT (is) (run-interp p)]
-      [listofT (elem) (run-interp p)])))
+      [listofT (elem) (run-interp p)]
+      [L-varT (is) (run-interp p)])
+    ))
 
 (define (run-interp [e : ExprC]) : s-expression
   (type-case Value (interp e mt-env)
