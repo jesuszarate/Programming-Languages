@@ -545,82 +545,82 @@
   (test/exn (run-prog '{let {[f : ? {lambda {[x : ?]} x}]}
                          {cons {f 1} {f empty}}})
             "no type")
-  ;(test/exn (run-prog '{lambda {[x : ?]}
-   ;                      {cons x 1}})
-    ;        "no type")
+  (test/exn (run-prog '{lambda {[x : ?]}
+                         {cons x 1}})
+            "no type")
   
-  ;(test (run-prog '{{lambda {[x : ?]} x} 2})
-   ;         `function)
+  (test (run-prog '{{lambda {[x : ?]} x} 2})
+            '2)
   
-  ;(test (run-prog '{let {[f : ?
-   ;                         {lambda {[x : ?]} {first x}}]}
-    ;                 {f {cons 1 empty}}})
-     ;   '1)
-;  (test (run-prog '{let {[f : ?
-;                            {lambda {[x : ?]} {first x}}]}
-;                     {f {cons 1 empty}}})
-;        '1)
-;  
-;  (test (run-prog '{lambda {[x : ?]}
-;                         {cons 1 x}})
-;            `function)  
-;
-;  (test (run-prog '{let {[f : ?
-;                            {lambda {[x : ?]} {cons 1 x}}]}
-;                     {f {cons 2 empty}}})
-;        `list)
-;  
-;  (test (typecheck (parse '{cons 1 {cons 2 empty}}) mt-env)
-;        (listofT (numT)))
-;  
-;  (test (typecheck (parse '{first {cons 1 empty}}) mt-env)
-;        (numT))
-;  
-;  (test (run-prog '{first {cons 1 empty}})
-;        '1)
-;   (test (run-prog '{+ 1 {first {cons 1 empty}}})
-;        '2)
-;  (test (run-prog '1)
-;        '1)
-;  
-;  (test (run-prog `empty)
-;        `list)
-;  
-;  (test (run-prog '{cons 1 empty})
-;        `list)
-;  (test (run-prog '{cons empty empty})
-;        `list)
-;  (test/exn (run-prog '{cons 1 {cons empty empty}})
-;            "no type")
-;  
-;  (test/exn (run-prog '{first 1})
-;            "no type")
-;  (test/exn (run-prog '{rest 1})
-;            "no type")
-;  
-;  (test/exn (run-prog '{first empty})
-;            "list is empty")
-;  (test/exn (run-prog '{rest empty})
-;            "list is empty")
-;  
-;  (test (run-prog '{let {[f : ?
-;                            {lambda {[x : ?]} {first x}}]}
-;                     {+ {f {cons 1 empty}} 3}})
-;        '4)
-;  (test (run-prog '{let {[f : ?
-;                            {lambda {[x : ?]}
-;                              {lambda {[y : ?]}
-;                                {cons x y}}}]}
-;                     {first {rest {{f 1} {cons 2 empty}}}}})
-;        '2)
-;  
-;  (test/exn (run-prog '{lambda {[x : ?]}
-;                         {cons x x}})
-;            "no type")
-;  
-;  (test/exn (run-prog '{let {[f : ? {lambda {[x : ?]} x}]}
-;                         {cons {f 1} {f empty}}})
-;            "no type")
+  (test (run-prog '{let {[f : ?
+                            {lambda {[x : ?]} {first x}}]}
+                     {f {cons 1 empty}}})
+        '1)
+  (test (run-prog '{let {[f : ?
+                            {lambda {[x : ?]} {first x}}]}
+                     {f {cons 1 empty}}})
+        '1)
+  
+  (test (run-prog '{lambda {[x : ?]}
+                         {cons 1 x}})
+            `function)  
+
+  (test (run-prog '{let {[f : ?
+                            {lambda {[x : ?]} {cons 1 x}}]}
+                     {f {cons 2 empty}}})
+        `list)
+  
+  (test (run-prog '{cons 1 {cons 2 empty}} )
+        `list)
+  
+  (test (run-prog '{first {cons 1 empty}})
+        '1)
+  
+  (test (run-prog '{first {cons 1 empty}})
+        '1)
+   (test (run-prog '{+ 1 {first {cons 1 empty}}})
+        '2)
+  (test (run-prog '1)
+        '1)
+  
+  (test (run-prog `empty)
+        `list)
+  
+  (test (run-prog '{cons 1 empty})
+        `list)
+  (test (run-prog '{cons empty empty})
+        `list)
+  (test/exn (run-prog '{cons 1 {cons empty empty}})
+            "no type")
+  
+  (test/exn (run-prog '{first 1})
+            "no type")
+  (test/exn (run-prog '{rest 1})
+            "no type")
+  
+  (test/exn (run-prog '{first empty})
+            "list is empty")
+  (test/exn (run-prog '{rest empty})
+            "list is empty")
+  
+  (test (run-prog '{let {[f : ?
+                            {lambda {[x : ?]} {first x}}]}
+                     {+ {f {cons 1 empty}} 3}})
+        '4)
+  (test (run-prog '{let {[f : ?
+                            {lambda {[x : ?]}
+                              {lambda {[y : ?]}
+                                {cons x y}}}]}
+                     {first {rest {{f 1} {cons 2 empty}}}}})
+        '2)
+  
+  (test/exn (run-prog '{lambda {[x : ?]}
+                         {cons x x}})
+            "no type")
+  
+  (test/exn (run-prog '{let {[f : ? {lambda {[x : ?]} x}]}
+                         {cons {f 1} {f empty}}})
+            "no type")
 
 ;;_____________________________________________  
   (define a-type-var (varT (box (none))))
