@@ -6,6 +6,7 @@
   [closV (arg : symbol)
          (body : ExprC)
          (env : Env)]
+  [boolV (b : boolean)]
   [listV (elems : (listof Value))])
 
 (define-type ExprC
@@ -24,7 +25,8 @@
   [consC (l : ExprC)
          (r : ExprC)]
   [firstC (a : ExprC)]
-  [restC (a : ExprC)])
+  [restC (a : ExprC)]
+  [boolC (t : boolean)])
 
 (define-type Type
   [numT]
@@ -57,7 +59,9 @@
   (cond
     [(s-exp-match? `empty s) (emptyC)]
     [(s-exp-match? `NUMBER s) (numC (s-exp->number s))]
-    [(s-exp-match? `SYMBOL s) (idC (s-exp->symbol s))]
+    [(s-exp-match? `true s) (boolC #t)]
+    [(s-exp-match? `false s) (boolC #f)]
+    [(s-exp-match? `SYMBOL s) (idC (s-exp->symbol s))]    
     [(s-exp-match? '{+ ANY ANY} s)
      (plusC (parse (second (s-exp->list s)))
             (parse (third (s-exp->list s))))]
@@ -180,28 +184,13 @@
               (if (empty? elems)
                   (error 'interp "list is empty")
                   (first elems)))]
-;            (type-case Value (interp a env)
-;                  [listV (elems) (if (empty? elems)
-;                                     (error 'interp "list is empty")
-;                                     (first elems))]
-;                  [else (error 'interp "not a list")])]
     [restC (a)
            (local [(define elems (listV-elems (interp a env)))]
              (if (empty? elems)
                  (error 'interp "list is empty")
-                 (listV (rest elems))))]))
-                 ;[else (error 'interp "not a list")])]))
-
-;           (local ([define elems (listV-elems (interp a env))])
- ;            (if (empty? elems)
-  ;               (error 'interp "list is empty")
-   ;              (listV (rest elems))))]))
-;           (type-case Value (interp a env)
-;                 [listV (elems) (if (empty? elems)
-;                                     (error 'interp "list is empty")
-;                                     (listV (rest elems)))]
-;                 [else (error 'interp "not a list")])]))
-
+                 (listV (rest elems))))]
+    [boolC (b) (boolV b)]))
+  
 (module+ test
   (test (interp (parse '2) mt-env)
         (numV 2))
@@ -362,7 +351,8 @@
                    (unify! (listofT result-type)
                            (typecheck a tenv)
                            a)
-                   (listofT result-type)))]))
+                   (listofT result-type)))]
+    [boolC (b) (boolT)]))
 
 (define (typecheck-nums l r tenv)
   (begin
@@ -494,18 +484,25 @@
       [boolT () (run-interp p)]
       [arrowT (arg result) (run-interp p)]            
       [varT (is) (run-interp p)]
-      [listofT (elem) (run-interp p)])))
+      [listofT (elem) (run-interp p)]
+      )))
 
 (define (run-interp [e : ExprC]) : s-expression
   (type-case Value (interp e mt-env)
-        [numV (n) (number->s-exp n)]
-        [closV (arg bod env) `function]
-        [listV (elems) `list]))
+    [numV (n) (number->s-exp n)]
+    [closV (arg bod env) `function]
+    [listV (elems) `list]
+    [boolV (b) (boolean->s-exp b)]))
 
 (module+ test 
 
   (test (run-prog '1)
         '1)
+  
+  (test (run-prog `true)
+        '#t)
+  (test (run-prog `false)
+        '#f)
   
   (test (run-prog `empty)
         `list)
