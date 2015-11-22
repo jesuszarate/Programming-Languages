@@ -2,13 +2,13 @@
 (require plai-typed/s-exp-match)
 
 (define-type Value
-  [numV (n : number)]
+  [litV (n : number)]
   [closV (arg : symbol)
          (body : ExprC)
          (env : Env)])
 
 (define-type ExprC
-  [numC (n : number)]
+  [litC (n : number)]
   [idC (s : symbol)]
   [plusC (l : ExprC) 
          (r : ExprC)]
@@ -35,7 +35,7 @@
 (define parse : (s-expression -> ExprC)
   (lambda (s)
     (cond
-     [(s-exp-match? `NUMBER s) (numC (s-exp->number s))]
+     [(s-exp-match? `NUMBER s) (litC (s-exp->number s))]
      [(s-exp-match? `SYMBOL s) (idC (s-exp->symbol s))]
      [(s-exp-match? '{+ ANY ANY} s)
       (plusC (parse (second (s-exp->list s)))
@@ -59,34 +59,39 @@
             (parse (second (s-exp->list s))))]
      [else (error 'parse "invalid input")])))
 
+(define (parse/num [s : s-expression]) : ExprC
+  (parse s))
+
 (module+ test
-  (test (parse '2)
-        (numC 2))
-  (test (parse `x) ; note: backquote instead of normal quote
+  (test (parse/num '2)
+        (litC 2))
+  (test (parse/num `x) ; note: backquote instead of normal quote
         (idC 'x))
-  (test (parse '{+ 2 1})
-        (plusC (numC 2) (numC 1)))
-  (test (parse '{* 3 4})
-        (multC (numC 3) (numC 4)))
-  (test (parse '{+ {* 3 4} 8})
-        (plusC (multC (numC 3) (numC 4))
-               (numC 8)))
-  (test (parse '{let {[x {+ 1 2}]}
-                  y})
+  (test (parse/num '{+ 2 1})
+        (plusC (litC 2) (litC 1)))
+  (test (parse/num '{* 3 4})
+        (multC (litC 3) (litC 4)))
+  (test (parse/num '{+ {* 3 4} 8})
+        (plusC (multC (litC 3) (litC 4))
+               (litC 8)))
+  (test (parse/num '{let {[x {+ 1 2}]}
+                      y})
         (appC (lamC 'x (idC 'y))
-              (plusC (numC 1) (numC 2))))
-  (test (parse '{lambda {x} 9})
-        (lamC 'x (numC 9)))
-  (test (parse '{double 9})
-        (appC (idC 'double) (numC 9)))
-  (test/exn (parse '{{+ 1 2}})
+              (plusC (litC 1) (litC 2))))
+  (test (parse/num '{lambda {x} 9})
+        (lamC 'x (litC 9)))
+  (test (parse/num '{double 9})
+        (appC (idC 'double) (litC 9)))
+  (test/exn (parse/num '{{+ 1 2}})
+            "invalid input")
+  (test/exn (parse/num '"a")
             "invalid input"))
 
 ;; interp ----------------------------------------
 (define interp : (ExprC Env -> Value)
   (lambda (a env)
     (type-case ExprC a
-      [numC (n) (numV n)]
+      [litC (n) (litV n)]
       [idC (s) (lookup s env)]
       [plusC (l r) (num+ (interp l env) (interp r env))]
       [multC (l r) (num* (interp l env) (interp r env))]
@@ -101,50 +106,53 @@
                                         c-env))]
                         [else (error 'interp "not a function")])])))
 
-(module+ test
-  (test (interp (parse '2) mt-env)
-        (numV 2))
-  (test/exn (interp (parse `x) mt-env)
-            "free variable")
-  (test (interp (parse `x) 
-                (extend-env (bind 'x (numV 9)) mt-env))
-        (numV 9))
-  (test (interp (parse '{+ 2 1}) mt-env)
-        (numV 3))
-  (test (interp (parse '{* 2 1}) mt-env)
-        (numV 2))
-  (test (interp (parse '{+ {* 2 3} {+ 5 8}})
-                mt-env)
-        (numV 19))
-  (test (interp (parse '{lambda {x} {+ x x}})
-                mt-env)
-        (closV 'x (plusC (idC 'x) (idC 'x)) mt-env))
-  (test (interp (parse '{let {[x 5]}
-                          {+ x x}})
-                mt-env)
-        (numV 10))
-  (test (interp (parse '{let {[x 5]}
-                          {let {[x {+ 1 x}]}
-                            {+ x x}}})
-                mt-env)
-        (numV 12))
-  (test (interp (parse '{let {[x 5]}
-                          {let {[y 6]}
-                            x}})
-                mt-env)
-        (numV 5))
-  (test (interp (parse '{{lambda {x} {+ x x}} 8})
-                mt-env)
-        (numV 16))
+(define (interp/num [a : ExprC] [env : Env]) : Value
+  (interp a env))
 
-  (test/exn (interp (parse '{1 2}) mt-env)
-            "not a function")
-  (test/exn (interp (parse '{+ 1 {lambda {x} x}}) mt-env)
-            "not a number")
-  (test/exn (interp (parse '{let {[bad {lambda {x} {+ x y}}]}
-                              {let {[y 5]}
-                                {bad 2}}})
+(module+ test
+  (test (interp/num (parse/num '2) mt-env)
+        (litV 2))
+  (test/exn (interp/num (parse/num `x) mt-env)
+            "free variable")
+  (test (interp/num (parse/num `x) 
+                    (extend-env (bind 'x (litV 9)) mt-env))
+        (litV 9))
+  (test (interp/num (parse/num '{+ 2 1}) mt-env)
+        (litV 3))
+  (test (interp/num (parse/num '{* 2 1}) mt-env)
+        (litV 2))
+  (test (interp/num (parse/num '{+ {* 2 3} {+ 5 8}})
                     mt-env)
+        (litV 19))
+  (test (interp/num (parse/num '{lambda {x} {+ x x}})
+                    mt-env)
+        (closV 'x (plusC (idC 'x) (idC 'x)) mt-env))
+  (test (interp/num (parse/num '{let {[x 5]}
+                                  {+ x x}})
+                    mt-env)
+        (litV 10))
+  (test (interp/num (parse/num '{let {[x 5]}
+                                  {let {[x {+ 1 x}]}
+                                    {+ x x}}})
+                    mt-env)
+        (litV 12))
+  (test (interp/num (parse/num '{let {[x 5]}
+                                  {let {[y 6]}
+                                    x}})
+                    mt-env)
+        (litV 5))
+  (test (interp/num (parse/num '{{lambda {x} {+ x x}} 8})
+                    mt-env)
+        (litV 16))
+
+  (test/exn (interp/num (parse/num '{1 2}) mt-env)
+            "not a function")
+  (test/exn (interp/num (parse/num '{+ 1 {lambda {x} x}}) mt-env)
+            "not a literal")
+  (test/exn (interp/num (parse/num '{let {[bad {lambda {x} {+ x y}}]}
+                                      {let {[y 5]}
+                                        {bad 2}}})
+                        mt-env)
             "free variable"))
 
 ;; num+ and num* ----------------------------------------
@@ -154,10 +162,10 @@
                   -> Value)
   (lambda (op l r)
     (cond
-     [(and (numV? l) (numV? r))
-      (numV (op (numV-n l) (numV-n r)))]
+     [(and (litV? l) (litV? r))
+      (litV (op (litV-n l) (litV-n r)))]
      [else
-      (error 'interp "not a number")])))
+      (error 'interp "not a literal")])))
 
 (define (num+ [l : Value] [r : Value]) : Value
   (num-op + l r))
@@ -165,10 +173,10 @@
   (num-op * l r))
 
 (module+ test
-  (test (num+ (numV 1) (numV 2))
-        (numV 3))
-  (test (num* (numV 2) (numV 3))
-        (numV 6)))
+  (test (num+ (litV 1) (litV 2))
+        (litV 3))
+  (test (num* (litV 2) (litV 3))
+        (litV 6)))
 
 ;; lookup ----------------------------------------
 (define lookup : (symbol Env -> Value)
@@ -183,13 +191,13 @@
 (module+ test
   (test/exn (lookup 'x mt-env)
             "free variable")
-  (test (lookup 'x (extend-env (bind 'x (numV 8)) mt-env))
-        (numV 8))
+  (test (lookup 'x (extend-env (bind 'x (litV 8)) mt-env))
+        (litV 8))
   (test (lookup 'x (extend-env
-                    (bind 'x (numV 9))
-                    (extend-env (bind 'x (numV 8)) mt-env)))
-        (numV 9))
+                    (bind 'x (litV 9))
+                    (extend-env (bind 'x (litV 8)) mt-env)))
+        (litV 9))
   (test (lookup 'y (extend-env
-                    (bind 'x (numV 9))
-                    (extend-env (bind 'y (numV 8)) mt-env)))
-        (numV 8)))
+                    (bind 'x (litV 9))
+                    (extend-env (bind 'y (litV 8)) mt-env)))
+        (litV 8)))
