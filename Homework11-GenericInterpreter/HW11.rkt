@@ -2,22 +2,22 @@
 (require plai-typed/s-exp-match)
 
 (define-type Value
-  [litV (n : number)]
+  [litV (n : 'a)]
   [closV (arg : symbol)
-         (body : ExprC)
+         (body : (ExprC 'a))
          (env : Env)])
 
-(define-type ExprC
-  [litC (n : number)]
+(define-type (ExprC 'a)
+  [litC (n : 'a)]
   [idC (s : symbol)]
-  [plusC (l : ExprC) 
-         (r : ExprC)]
-  [multC (l : ExprC)
-         (r : ExprC)]
+  [plusC (l : (ExprC 'a)) 
+         (r : (ExprC 'a))]
+  [multC (l : (ExprC 'a))
+         (r : (ExprC 'a))]
   [lamC (n : symbol)
-        (body : ExprC)]
-  [appC (fun : ExprC)
-        (arg : ExprC)])
+        (body : (ExprC 'a))]
+  [appC (fun : (ExprC 'a))
+        (arg : (ExprC 'a))])
 
 (define-type Binding
   [bind (name : symbol)
@@ -32,37 +32,67 @@
   (print-only-errors true))
 
 ;; parse ----------------------------------------
-(define parse : (s-expression -> ExprC)
-  (lambda (s)
-    (cond
-     [(s-exp-match? `NUMBER s) (litC (s-exp->number s))]
-     [(s-exp-match? `SYMBOL s) (idC (s-exp->symbol s))]
-     [(s-exp-match? '{+ ANY ANY} s)
-      (plusC (parse (second (s-exp->list s)))
-             (parse (third (s-exp->list s))))]
-     [(s-exp-match? '{* ANY ANY} s)
-      (multC (parse (second (s-exp->list s)))
-             (parse (third (s-exp->list s))))]
-     [(s-exp-match? '{let {[SYMBOL ANY]} ANY} s)
-      (let ([bs (s-exp->list (first
-                              (s-exp->list (second
-                                            (s-exp->list s)))))])
-        (appC (lamC (s-exp->symbol (first bs))
-                    (parse (third (s-exp->list s))))
-              (parse (second bs))))]
-     [(s-exp-match? '{lambda {SYMBOL} ANY} s)
-      (lamC (s-exp->symbol (first (s-exp->list 
-                                   (second (s-exp->list s)))))
-            (parse (third (s-exp->list s))))]
-     [(s-exp-match? '{ANY ANY} s)
-      (appC (parse (first (s-exp->list s)))
-            (parse (second (s-exp->list s))))]
-     [else (error 'parse "invalid input")])))
+(define (parse [s : s-expression]
+               [pat : s-expression]
+               [s-exp-> : (s-expression -> 'a)]) :  (ExprC 'a)
+  ;(lambda (s)    
+    (cond      
+      [(s-exp-match? pat s) (litC (s-exp-> s))]
+      [(s-exp-match? `SYMBOL s) (idC (s-exp->symbol s))]
+      [(s-exp-match? '{+ ANY ANY} s)
+       (plusC (parse (second (s-exp->list s)) pat s-exp->)
+              (parse (third (s-exp->list s)) pat s-exp->))]
+      [(s-exp-match? '{* ANY ANY} s)
+       (multC (parse (second (s-exp->list s)) pat s-exp->)
+              (parse (third (s-exp->list s)) pat s-exp->))]
+      [(s-exp-match? '{let {[SYMBOL ANY]} ANY} s)
+       (let ([bs (s-exp->list (first
+                               (s-exp->list (second
+                                             (s-exp->list s)))))])
+         (appC (lamC (s-exp->symbol (first bs))
+                     (parse (third (s-exp->list s)) pat s-exp->))
+               (parse (second bs) pat s-exp->)))]
+      [(s-exp-match? '{lambda {SYMBOL} ANY} s)
+       (lamC (s-exp->symbol (first (s-exp->list 
+                                    (second (s-exp->list s)))))
+             (parse (third (s-exp->list s)) pat s-exp->))]
+      [(s-exp-match? '{ANY ANY} s)
+       (appC (parse (first (s-exp->list s)) pat s-exp->)
+             (parse (second (s-exp->list s)) pat s-exp->))]
+      [else (error 'parse "invalid input")]))
 
-(define (parse/num [s : s-expression]) : ExprC
-  (parse s))
+(define (parse/num [s : s-expression]) : (ExprC 'a)
+  (parse s `NUMBER s-exp->number))
+
+(define (parse/str [s : s-expression]) : (ExprC 'a)
+  (parse s `STRING s-exp->string))
 
 (module+ test
+  ;;String tests --------------------------------------------------
+  (test (parse/str '"a")
+        (litC "a"))
+  (test (parse/str `x) ; note: backquote instead of normal quote
+        (idC 'x))
+  (test (parse/str '{+ "b" "a"})
+        (plusC (litC "b") (litC "a")))
+  (test (parse/str '{* "c" "d"})
+        (multC (litC "c") (litC "d")))
+  (test (parse/str '{+ {* "c" "d"} "e"})
+        (plusC (multC (litC "c") (litC "d"))
+               (litC "e")))
+  (test (parse/str '{let {[x {+ "a" "b"}]}
+                      y})
+        (appC (lamC 'x (idC 'y))
+              (plusC (litC "a") (litC "b"))))
+  (test (parse/str '{lambda {x} "g"})
+        (lamC 'x (litC "g")))
+  (test (parse/str '{double "g"})
+        (appC (idC 'double) (litC "g")))
+  (test/exn (parse/str '{{+ "a" "b"}})
+            "invalid input")
+  (test/exn (parse/str '1)
+            "invalid input")
+  ;;Number tests --------------------------------------------------
   (test (parse/num '2)
         (litC 2))
   (test (parse/num `x) ; note: backquote instead of normal quote
@@ -88,9 +118,9 @@
             "invalid input"))
 
 ;; interp ----------------------------------------
-(define interp : (ExprC Env -> Value)
+(define interp : ((ExprC 'a) Env -> Value)
   (lambda (a env)
-    (type-case ExprC a
+    (type-case (ExprC 'a) a
       [litC (n) (litV n)]
       [idC (s) (lookup s env)]
       [plusC (l r) (num+ (interp l env) (interp r env))]
@@ -106,7 +136,7 @@
                                         c-env))]
                         [else (error 'interp "not a function")])])))
 
-(define (interp/num [a : ExprC] [env : Env]) : Value
+(define (interp/num [a : (ExprC 'a)] [env : Env]) : Value
   (interp a env))
 
 (module+ test
