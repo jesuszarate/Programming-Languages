@@ -32,10 +32,9 @@
   (print-only-errors true))
 
 ;; parse ----------------------------------------
-(define (parse [s : s-expression]
-               [pat : s-expression]
-               [s-exp-> : (s-expression -> 'a)]) :  (ExprC 'a)
-  ;(lambda (s)    
+(define parse 
+  : (s-expression s-expression (s-expression -> 'a) -> (ExprC 'a))               
+  (lambda (s pat s-exp->)
     (cond      
       [(s-exp-match? pat s) (litC (s-exp-> s))]
       [(s-exp-match? `SYMBOL s) (idC (s-exp->symbol s))]
@@ -59,7 +58,7 @@
       [(s-exp-match? '{ANY ANY} s)
        (appC (parse (first (s-exp->list s)) pat s-exp->)
              (parse (second (s-exp->list s)) pat s-exp->))]
-      [else (error 'parse "invalid input")]))
+      [else (error 'parse "invalid input")])))
 
 (define (parse/num [s : s-expression]) : (ExprC 'a)
   (parse s `NUMBER s-exp->number))
@@ -139,7 +138,59 @@
 (define (interp/num [a : (ExprC 'a)] [env : Env]) : Value
   (interp a env))
 
+(define (interp/str [a : (ExprC 'a)] [env : Env]) : Value
+  (interp a env))
+
+
 (module+ test
+  ;; STRING TESTS ----------------------------------------
+  
+;  (test (interp/str (parse/str '"b") mt-env)
+;        (litV "b"))
+;  (test/exn (interp/str (parse/str `x) mt-env)
+;            "free variable")
+;  (test (interp/str (parse/str `x) 
+;                    (extend-env (bind 'x (litV "g")) mt-env))
+;        (litV "g"))
+;  (test (interp/str (parse/str '{+ "b" "a"}) mt-env)
+;        (litV "ba"))
+;  (test (interp/str (parse/str '{* "b" "a"}) mt-env)
+;        (litV "a"))
+;  (test (interp/str (parse/str '{+ {* "a" "b"} {+ "c" "d"}})
+;                    mt-env)
+;        (litV "bcd"))
+;  (test (interp/str (parse/str '{lambda {x} {+ x x}})
+;                    mt-env)
+;        (closV 'x (plusC (idC 'x) (idC 'x)) mt-env))
+;  (test (interp/str (parse/str '{let {[x "e"]}
+;                                  {+ x x}})
+;                    mt-env)
+;        (litV "ee"))
+;  (test (interp/str (parse/str '{let {[x "e"]}
+;                                  {let {[x {+ "a" x}]}
+;                                    {+ x x}}})
+;                    mt-env)
+;        (litV "aeae"))
+;  (test (interp/str (parse/str '{let {[x "e"]}
+;                                  {let {[y "f"]}
+;                                    x}})
+;                    mt-env)
+;        (litV "e"))
+;  (test (interp/str (parse/str '{{lambda {x} {+ x x}} "f"})
+;                    mt-env)
+;        (litV "ff"))
+;
+;  (test/exn (interp/str (parse/str '{"a" "b"}) mt-env)
+;            "not a function")
+;  (test/exn (interp/str (parse/str '{+ "a" {lambda {x} x}}) mt-env)
+;            "not a literal")
+;  (test/exn (interp/str (parse/str '{let {[bad {lambda {x} {+ x y}}]}
+;                                      {let {[y "e"]}
+;                                        {bad "b"}}})
+;                        mt-env)
+;            "free variable")
+  
+  ;; NUMBER TESTS ----------------------------------------
   (test (interp/num (parse/num '2) mt-env)
         (litV 2))
   (test/exn (interp/num (parse/num `x) mt-env)
