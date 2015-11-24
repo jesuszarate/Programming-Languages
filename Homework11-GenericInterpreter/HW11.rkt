@@ -1,29 +1,29 @@
 #lang plai-typed
 (require plai-typed/s-exp-match)
 
-(define-type Value
+(define-type (Value 'a)
   [litV (n : 'a)]
   [closV (arg : symbol)
-         (body : (ExprC 'a))
+         (body : (ExprC 'b))
          (env : Env)])
 
-(define-type (ExprC 'a)
-  [litC (n : 'a)]
+(define-type (ExprC 'b)
+  [litC (n : 'b)]
   [idC (s : symbol)]
-  [plusC (l : (ExprC 'a)) 
-         (r : (ExprC 'a))]
-  [multC (l : (ExprC 'a))
-         (r : (ExprC 'a))]
+  [plusC (l : (ExprC 'b)) 
+         (r : (ExprC 'b))]
+  [multC (l : (ExprC 'b))
+         (r : (ExprC 'b))]
   [lamC (n : symbol)
-        (body : (ExprC 'a))]
-  [appC (fun : (ExprC 'a))
-        (arg : (ExprC 'a))])
+        (body : (ExprC 'b))]
+  [appC (fun : (ExprC 'b))
+        (arg : (ExprC 'b))])
 
-(define-type Binding
+(define-type (Binding 'a)
   [bind (name : symbol)
-        (val : Value)])
+        (val : (Value 'a))])
 
-(define-type-alias Env (listof Binding))
+(define-type-alias Env (listof (Binding 'a)))
 
 (define mt-env empty)
 (define extend-env cons)
@@ -33,7 +33,7 @@
 
 ;; parse ----------------------------------------
 (define parse 
-  : (s-expression s-expression (s-expression -> 'a) -> (ExprC 'a))               
+  : (s-expression s-expression (s-expression -> 'b) -> (ExprC 'b))               
   (lambda (s pat s-exp->)
     (cond      
       [(s-exp-match? pat s) (litC (s-exp-> s))]
@@ -117,78 +117,82 @@
             "invalid input"))
 
 ;; interp ----------------------------------------
-(define interp : ((ExprC 'a) Env -> Value)
-  (lambda (a env)
-    (type-case (ExprC 'a) a
+(define interp : ((ExprC 'b)
+                  Env
+                  'plus
+                  'mult
+                  -> (Value 'a))
+  (lambda (a env p m)
+    (type-case (ExprC 'b) a
       [litC (n) (litV n)]
       [idC (s) (lookup s env)]
-      [plusC (l r) (num+ (interp l env) (interp r env))]
-      [multC (l r) (num* (interp l env) (interp r env))]
+      [plusC (l r) (p (interp l env p m) (interp r env p m))]                 
+      [multC (l r) (m (interp l env p m) (interp r env p m))]
       [lamC (n body)
             (closV n body env)]
-      [appC (fun arg) (type-case Value (interp fun env)
+      [appC (fun arg) (type-case (Value 'a) (interp fun env p m)
                         [closV (n body c-env)
                                (interp body
                                        (extend-env
                                         (bind n
-                                              (interp arg env))
-                                        c-env))]
+                                              (interp arg env p m))
+                                        c-env) p m)]
                         [else (error 'interp "not a function")])])))
 
-(define (interp/num [a : (ExprC 'a)] [env : Env]) : Value
-  (interp a env))
+(define (interp/num [a : (ExprC 'a)] [env : Env]) : (Value 'a)
+  (interp a env num+ num*))
 
-(define (interp/str [a : (ExprC 'a)] [env : Env]) : Value
-  (interp a env))
+(define (interp/str [a : (ExprC 'a)] [env : Env]) : (Value 'a)
+  (interp a env str+ str*))
 
 
 (module+ test
-  ;; STRING TESTS ----------------------------------------
   
-;  (test (interp/str (parse/str '"b") mt-env)
-;        (litV "b"))
-;  (test/exn (interp/str (parse/str `x) mt-env)
-;            "free variable")
-;  (test (interp/str (parse/str `x) 
-;                    (extend-env (bind 'x (litV "g")) mt-env))
-;        (litV "g"))
-;  (test (interp/str (parse/str '{+ "b" "a"}) mt-env)
-;        (litV "ba"))
-;  (test (interp/str (parse/str '{* "b" "a"}) mt-env)
-;        (litV "a"))
-;  (test (interp/str (parse/str '{+ {* "a" "b"} {+ "c" "d"}})
-;                    mt-env)
-;        (litV "bcd"))
-;  (test (interp/str (parse/str '{lambda {x} {+ x x}})
-;                    mt-env)
-;        (closV 'x (plusC (idC 'x) (idC 'x)) mt-env))
-;  (test (interp/str (parse/str '{let {[x "e"]}
-;                                  {+ x x}})
-;                    mt-env)
-;        (litV "ee"))
-;  (test (interp/str (parse/str '{let {[x "e"]}
-;                                  {let {[x {+ "a" x}]}
-;                                    {+ x x}}})
-;                    mt-env)
-;        (litV "aeae"))
-;  (test (interp/str (parse/str '{let {[x "e"]}
-;                                  {let {[y "f"]}
-;                                    x}})
-;                    mt-env)
-;        (litV "e"))
-;  (test (interp/str (parse/str '{{lambda {x} {+ x x}} "f"})
-;                    mt-env)
-;        (litV "ff"))
-;
-;  (test/exn (interp/str (parse/str '{"a" "b"}) mt-env)
-;            "not a function")
-;  (test/exn (interp/str (parse/str '{+ "a" {lambda {x} x}}) mt-env)
-;            "not a literal")
-;  (test/exn (interp/str (parse/str '{let {[bad {lambda {x} {+ x y}}]}
-;                                      {let {[y "e"]}
-;                                        {bad "b"}}})
-;                        mt-env)
-;            "free variable")
+  ;; STRING TESTS ----------------------------------------  
+  (test (interp/str (parse/str '"b") mt-env)
+        (litV "b"))
+  (test/exn (interp/str (parse/str `x) mt-env)
+            "free variable")
+  (test (interp/str (parse/str `x) 
+                    (extend-env (bind 'x (litV "g")) mt-env))
+        (litV "g"))
+  (test (interp/str (parse/str '{+ "b" "a"}) mt-env)
+        (litV "ba"))
+  (test (interp/str (parse/str '{* "b" "a"}) mt-env)
+        (litV "a"))
+  (test (interp/str (parse/str '{+ {* "a" "b"} {+ "c" "d"}})
+                    mt-env)
+        (litV "bcd"))
+  (test (interp/str (parse/str '{lambda {x} {+ x x}})
+                    mt-env)
+        (closV 'x (plusC (idC 'x) (idC 'x)) mt-env))
+  (test (interp/str (parse/str '{let {[x "e"]}
+                                  {+ x x}})
+                    mt-env)
+        (litV "ee"))
+  (test (interp/str (parse/str '{let {[x "e"]}
+                                  {let {[x {+ "a" x}]}
+                                    {+ x x}}})
+                    mt-env)
+        (litV "aeae"))
+  (test (interp/str (parse/str '{let {[x "e"]}
+                                  {let {[y "f"]}
+                                    x}})
+                    mt-env)
+        (litV "e"))
+  (test (interp/str (parse/str '{{lambda {x} {+ x x}} "f"})
+                    mt-env)
+        (litV "ff"))
+
+  (test/exn (interp/str (parse/str '{"a" "b"}) mt-env)
+            "not a function")
+  (test/exn (interp/str (parse/str '{+ "a" {lambda {x} x}}) mt-env)
+            "not a literal")
+  (test/exn (interp/str (parse/str '{let {[bad {lambda {x} {+ x y}}]}
+                                      {let {[y "e"]}
+                                        {bad "b"}}})
+                        mt-env)
+            "free variable")
   
   ;; NUMBER TESTS ----------------------------------------
   (test (interp/num (parse/num '2) mt-env)
@@ -234,13 +238,14 @@
                                       {let {[y 5]}
                                         {bad 2}}})
                         mt-env)
-            "free variable"))
+            "free variable")
+  )
 
 ;; num+ and num* ----------------------------------------
-(define num-op : ((number number -> number)
-                  Value
-                  Value
-                  -> Value)
+(define lit-op : (('a 'a -> 'a)
+                  (Value 'a)
+                  (Value 'a)
+                  -> (Value 'a))
   (lambda (op l r)
     (cond
      [(and (litV? l) (litV? r))
@@ -248,19 +253,39 @@
      [else
       (error 'interp "not a literal")])))
 
-(define (num+ [l : Value] [r : Value]) : Value
-  (num-op + l r))
-(define (num* [l : Value] [r : Value]) : Value
-  (num-op * l r))
+(define (string-mult [a : string] [b : string])
+  (foldl (lambda (c r) (string-append b r))
+         ""
+         (string->list a)))
+
+(define (str+ [l : (Value 'a)] [r : (Value 'a)]) : (Value 'a)
+  (lit-op string-append l r))
+
+(define (str* [l : (Value 'a)] [r : (Value 'a)]) : (Value 'a)
+  (lit-op string-mult l r))
+
+(define (num+ [l : (Value 'a)] [r : (Value 'a)]) : (Value 'a)
+  (lit-op + l r))
+(define (num* [l : (Value 'a)] [r : (Value 'a)]) : (Value 'a)
+  (lit-op * l r))
+
+;(define (lit+ [l : (Value 'a)] [r : (Value 'a)]) : (Value 'a)
+ ; (cond
+  ;  [ (lit-op string-append l r)])
 
 (module+ test
+  (test (str+ (litV "abc") (litV "de"))
+        (litV "abcde"))
+  (test (str* (litV "abc") (litV "de"))
+        (litV "dedede"))
   (test (num+ (litV 1) (litV 2))
         (litV 3))
   (test (num* (litV 2) (litV 3))
-        (litV 6)))
+        (litV 6))
+  )
 
 ;; lookup ----------------------------------------
-(define lookup : (symbol Env -> Value)
+(define lookup : (symbol Env -> (Value 'a))
   (lambda (n env)
     (cond
      [(empty? env) (error 'lookup "free variable")]
@@ -270,6 +295,20 @@
             [else (lookup n (rest env))])])))
 
 (module+ test
+
+ (test/exn (lookup 'x mt-env)
+            "free variable")
+  (test (lookup 'x (extend-env (bind 'x (litV "f")) mt-env))
+        (litV "f"))
+  (test (lookup 'x (extend-env
+                    (bind 'x (litV "g"))
+                    (extend-env (bind 'x (litV "f")) mt-env)))
+        (litV "g"))
+  (test (lookup 'y (extend-env
+                    (bind 'x (litV "g"))
+                    (extend-env (bind 'y (litV "f")) mt-env)))
+        (litV "f"))
+  ;; String tests ----------------------------------------
   (test/exn (lookup 'x mt-env)
             "free variable")
   (test (lookup 'x (extend-env (bind 'x (litV 8)) mt-env))
