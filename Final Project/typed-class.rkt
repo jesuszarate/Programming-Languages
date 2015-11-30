@@ -1,5 +1,4 @@
 #lang plai-typed
-#lang plai-typed
 
 (require "class.rkt"
          "inherit.rkt")
@@ -181,7 +180,11 @@
                   (typecheck-send (classT-super-name this-class)
                                   method-name
                                   arg-expr arg-type
-                                  t-classes))]))))
+                                  t-classes))]
+        [instanceofI (obj-expr class-name)
+                     (type-case Type (recur obj-expr)
+                       [objT (class-name) (objT class-name)]
+                       [else (type-error obj-expr "object")])]))))
 
 (define (typecheck-send [class-name : symbol]
                         [method-name : symbol]
@@ -278,6 +281,16 @@
   (define posn27 (newI 'posn (list (numI 2) (numI 7))))
   (define posn531 (newI 'posn3D (list (numI 5) (numI 3) (numI 1))))
 
+
+  ;;instanceof ----------------------------------------------------
+  (test (typecheck-posn (instanceofI posn27 'posn))
+      (objT 'posn))
+  
+  (test/exn (typecheck-posn (instanceofI (numI 3) 'posn))
+      "no type")
+  
+  ;;---------------------------------------------------------------
+  
   (test (typecheck-posn (sendI posn27 'mdist (numI 0)))
         (numT))
   (test (typecheck-posn (sendI posn531 'mdist (numI 0)))
