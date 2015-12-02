@@ -22,6 +22,9 @@
   ;; My implemetations---------------
   [instanceofC (obj-expr : ExprC)               
                (class-name : symbol)]
+  [if0C (tst : ExprC)
+        (thn : ExprC)
+        (els : ExprC)]
   )
 
 (define-type ClassC
@@ -156,6 +159,9 @@
                                    (find-class class-name classes)
                                    (numV 1)))]
                        [else (error 'interp "not an object")])]
+        [if0C (tst thn els) (if (equal? (recur tst) (numV 0))
+                                (recur thn)
+                                (recur els))]
         ))))
 
 (define (call-method class-name method-name classes
@@ -219,6 +225,17 @@
 
 (module+ test
 
+  ;;if0 ----------------------------------------------
+  (test (interp
+         (if0C (numC 0) (numC 1) (numC 2))
+         empty (numV -1) (numV -1))
+        (numV 1))
+  
+  (test (interp
+         (if0C (numC 1) (numC 1) (numC 2))
+         empty (numV -1) (numV -1))
+        (numV 2))
+  
   ;;Instanceof ----------------------------------------
   (test (interp-posn (instanceofC posn27 'posn))
         (numV 0))

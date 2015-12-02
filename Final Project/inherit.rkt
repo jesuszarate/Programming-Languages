@@ -25,7 +25,9 @@
   ;; My implemetations---------------
   [instanceofI (obj-expr : ExprI)
                (class-name : symbol)]
-  )
+  [if0I (tst : ExprI)
+        (thn : ExprI)
+        (els : ExprI)])  
 
 (define-type ClassI
   [classI (name : symbol)
@@ -68,10 +70,14 @@
       [instanceofI (obj-expr class-name)
                    (instanceofC (recur obj-expr)
                                 class-name)]
+      [if0I (tst thn els) (if0C (recur tst) (recur thn) (recur els))]
       )))
 
 (module+ test
-
+  ;;instanceof----------------------------------------
+  (test (expr-i->c (if0I (numI 0) (numI 1) (numI 2)) 'object)
+        (if0C (numC 0) (numC 1) (numC 2)))
+  
   ;;instanceof----------------------------------------
   (test (expr-i->c (instanceofI (numI 1) 'posn) 'posn)
         (instanceofC (numC 1) 'posn))

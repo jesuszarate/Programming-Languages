@@ -183,9 +183,18 @@
                                   t-classes))]
         [instanceofI (obj-expr class-name)
                      (type-case Type (recur obj-expr)
-                       [objT (class-name) (objT class-name)]
-                       [else (type-error obj-expr "object")])]))))
-
+                       [objT (c-name) (numT)]
+                       [else (type-error obj-expr "object")])]
+        [if0I (tst thn els)
+              (if (is-subtype? (recur tst) (numT) empty)
+                  (local [(define t-thn (recur thn))
+                          (define t-els (recur els))]
+                    [cond
+                      [(is-subtype? t-thn t-els empty) t-els]
+                      [(is-subtype? t-els t-thn empty) t-thn]
+                      [else (type-error els (to-string els))]])
+                  (type-error tst "num"))]))))
+              
 (define (typecheck-send [class-name : symbol]
                         [method-name : symbol]
                         [arg-expr : ExprI]
@@ -281,10 +290,23 @@
   (define posn27 (newI 'posn (list (numI 2) (numI 7))))
   (define posn531 (newI 'posn3D (list (numI 5) (numI 3) (numI 1))))
 
+  ;;this & arg----------------------------------------------------
+  ;(test (typecheck (thisI) empty)
+  ;    (numT))
 
+  ;;if0 ----------------------------------------------------
+  (test (typecheck (if0I (numI 0)
+                         (sendI posn27 'mdist (numI 0))
+                         (sendI posn531 'mdist (numI 0))) empty)
+        (numT))
+  
+  (test (typecheck-posn (if0I (numI 0) (numI 1) (numI 2)))
+        (numT))
+  
   ;;instanceof ----------------------------------------------------
+  
   (test (typecheck-posn (instanceofI posn27 'posn))
-      (objT 'posn))
+      (numT))
   
   (test/exn (typecheck-posn (instanceofI (numI 3) 'posn))
       "no type")
@@ -362,8 +384,8 @@
                     methods))])))
 
 (define interp-t : (ExprI (listof ClassT) -> Value)
-  (lambda (a t-classes)
-    (interp-i a
+  (lambda (a t-classes)    
+     (interp-i a
               (map strip-types t-classes))))
 
 (module+ test
