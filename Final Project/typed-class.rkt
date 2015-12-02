@@ -181,6 +181,7 @@
                                   method-name
                                   arg-expr arg-type
                                   t-classes))]
+        ;; My implemetations------------------------------------
         [instanceofI (obj-expr class-name)
                      (type-case Type (recur obj-expr)
                        [objT (c-name) (numT)]
@@ -190,10 +191,11 @@
                   (local [(define t-thn (recur thn))
                           (define t-els (recur els))]
                     [cond
-                      [(is-subtype? t-thn t-els empty) t-els]
-                      [(is-subtype? t-els t-thn empty) t-thn]
-                      [else (type-error els (to-string els))]])
-                  (type-error tst "num"))]))))
+                      [(is-subtype? t-thn t-els t-classes) t-els]
+                      [(is-subtype? t-els t-thn t-classes) t-thn]])                      
+                  (type-error tst "num"))]
+        [nullI () (objT 'null)]
+        ))))
               
 (define (typecheck-send [class-name : symbol]
                         [method-name : symbol]
@@ -293,15 +295,37 @@
   ;;this & arg----------------------------------------------------
   ;(test (typecheck (thisI) empty)
   ;    (numT))
+  (test (typecheck-posn (if0I (numI 0) (thisI) (numI 2)))
+        (numT))
+  (test (typecheck-posn (sendI posn27 'mdist (thisI)))
+        (numT))
 
+  ; Example of where null would work
+  ;;null ----------------------------------------------------
+  (test (typecheck-posn (if0I (numI 0)
+                              (nullI)
+                              (newI 'posn3D (list (numI 5) (numI 3) (numI 3)))))
+        (objT 'posn))
+  
+  ; What should happen if one is not a subtype of the other
   ;;if0 ----------------------------------------------------
-  (test (typecheck (if0I (numI 0)
-                         (sendI posn27 'mdist (numI 0))
-                         (sendI posn531 'mdist (numI 0))) empty)
+  (test (typecheck-posn (if0I (numI 0)
+                              (newI 'posn (list (numI 2) (numI 7)))
+                              (newI 'posn3D (list (numI 5) (numI 3) (numI 3)))))
+        (objT 'posn))
+  
+  (test (typecheck-posn (if0I (numI 0)
+                              (newI 'posn3D (list (numI 5) (numI 3) (numI 3)))
+                              (newI 'posn (list (numI 2) (numI 7)))))
+        (objT 'posn))
+  
+  
+  (test (typecheck (if0I (numI 0) (numI 1) (numI 2)) empty)
         (numT))
   
-  (test (typecheck-posn (if0I (numI 0) (numI 1) (numI 2)))
-        (numT))
+  
+  (test/exn (typecheck (if0I (newI 'object empty) (numI 1) (numI 2)) empty)
+        "no type")
   
   ;;instanceof ----------------------------------------------------
   
@@ -383,8 +407,10 @@
                                  (methodI name body-expr)]))
                     methods))])))
 
+  
 (define interp-t : (ExprI (listof ClassT) -> Value)
-  (lambda (a t-classes)    
+  (lambda (a t-classes)
+    ;(typecheck a t-classes)
      (interp-i a
               (map strip-types t-classes))))
 

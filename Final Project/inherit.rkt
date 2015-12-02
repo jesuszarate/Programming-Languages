@@ -27,7 +27,8 @@
                (class-name : symbol)]
   [if0I (tst : ExprI)
         (thn : ExprI)
-        (els : ExprI)])  
+        (els : ExprI)]
+  [nullI])  
 
 (define-type ClassI
   [classI (name : symbol)
@@ -71,9 +72,14 @@
                    (instanceofC (recur obj-expr)
                                 class-name)]
       [if0I (tst thn els) (if0C (recur tst) (recur thn) (recur els))]
+      [nullI () (nullC)]
       )))
 
 (module+ test
+  ;;null ---------------------------------------------
+  (test (expr-i->c (nullI) 'object)
+        (nullC))
+  
   ;;instanceof----------------------------------------
   (test (expr-i->c (if0I (numI 0) (numI 1) (numI 2)) 'object)
         (if0C (numC 0) (numC 1) (numC 2)))
@@ -287,6 +293,8 @@
     (interp a classes (numV -1) (numV -1))))
 
 (module+ test
+  (test (interp-i (nullI) empty)
+        (nullV))
   (test (interp-i (numI 0) empty)
         (numV 0))
 

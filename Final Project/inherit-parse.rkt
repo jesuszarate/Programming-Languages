@@ -56,6 +56,7 @@
    [(s-exp-match? '{super SYMBOL ANY} s)
     (superI (s-exp->symbol (second (s-exp->list s)))
             (parse (third (s-exp->list s))))]
+   ;; My implemetations----------------------------------
    [(s-exp-match? '{instanceof ANY SYMBOL} s)
     (instanceofI (parse (second (s-exp->list s)))
                  (s-exp->symbol (third (s-exp->list s))))]
@@ -63,6 +64,7 @@
     (if0I (parse (second (s-exp->list s)))
           (parse (third (s-exp->list s)))
           (parse (fourth (s-exp->list s))))]
+   [(s-exp-match? `null s) (nullI)]
    [else (error 'parse "invalid input")]))
 
 (module+ test
@@ -145,11 +147,15 @@
                      (map parse-class classes))])
     (type-case Value v
       [numV (n) (number->s-exp n)]
-      [objV (class-name field-vals) `object])))
+      [objV (class-name field-vals) `object]
+      [nullV () `null])))
 
 (module+ test
-
-  ;;  ----------------------------------------
+  ;;null  ----------------------------------------
+  (test (interp-prog empty `null)
+        `null)
+  
+  ;;  --------------------------------------------
   (test (interp-prog (list '{class fish extends object
                                    {size color}})
                      '{instanceof {new fish 1 2} fish})
