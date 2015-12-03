@@ -28,7 +28,9 @@
   [if0I (tst : ExprI)
         (thn : ExprI)
         (els : ExprI)]
-  [nullI])  
+  [nullI]
+  [castI (class-name : symbol)
+         (obj-expr : ExprI)])  
 
 (define-type ClassI
   [classI (name : symbol)
@@ -73,9 +75,14 @@
                                 class-name)]
       [if0I (tst thn els) (if0C (recur tst) (recur thn) (recur els))]
       [nullI () (nullC)]
+      [castI (class-name obj-expr) (castC class-name (recur obj-expr))]
       )))
 
 (module+ test
+  ;;castC ---------------------------------------------
+  (test (expr-i->c (castI 'object (newI 'posn (list (numI 1)))) 'object)
+        (castC 'object (newC 'posn (list (numC 1)))))
+  
   ;;null ---------------------------------------------
   (test (expr-i->c (nullI) 'object)
         (nullC))

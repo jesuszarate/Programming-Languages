@@ -260,6 +260,9 @@
   (test (interp-posn (castC 'posn posn27))
         (objV 'posn (list (numV 2) (numV 7))))
 
+  (test (interp-posn (castC 'object posn))
+        (objV 'posn (list (numV 2) (numV 7))))
+  
   (test/exn (interp-posn (castC 'posn3D posn))
         "cannot cast")
   
