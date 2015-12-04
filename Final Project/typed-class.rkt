@@ -138,7 +138,7 @@
         [numI (n) (numT)]
         [plusI (l r) (typecheck-nums l r)]
         [multI (l r) (typecheck-nums l r)]
-        [argI () arg-type]
+        [argI () arg-type] ; Check here if arg is part of the main or a method (if it's in expr then it wont work)
         [thisI () this-type]
         [newI (class-name exprs)
               (local [(define arg-types (map recur exprs))
@@ -273,7 +273,7 @@
   (begin
     (map (lambda (t-class)
            (typecheck-class t-class t-classes))
-         t-classes)
+         t-classes)    
     (typecheck-expr a t-classes (numT) (objT 'bad))))
 
 ;; ----------------------------------------
@@ -308,30 +308,44 @@
   
   (define nothing-t-class
     (classT 'nothing 'object
-            (list (fieldT 'p (objT 'posn)))
+            (list (fieldT 'p (objT 'nothing)))
             empty))
 
-  (define nothing2D-t-class
-    (classT 'nothing2D 'nothing
-            (list (fieldT 'p (objT 'posn)))
-            empty))
+  (define nothing2-t-class
+    (classT 'nothing2 'object
+            (list (fieldT 'x (numT)) (fieldT 'y (numT)))
+            (list (methodT 'mdist (numT) (numT) 
+                           (plusI (getI (nullI) 'x) (getI (thisI) 'y))))))
 
+  ;(define nothing2D-t-class
+   ; (classT 'nothing2D 'nothing
+    ;        (list (fieldT 'p (objT 'posn)))
+     ;       (list (methodT 'mdist (numT) (numT)
+      ;                     (plusI (getI (thisI) 'z) 
+       ;                           (superI 'mdist (argI)))))))
+
+  (define (typecheck-nothing a)
+    (typecheck a
+               (list nothing2-t-class)))
   
   (define (typecheck-posn a)
     (typecheck a
                (list posn-t-class posn3D-t-class posn4D-t-class square-t-class nothing-t-class)))
 
+  (define nothing-null (nullI))
+  (define nothing2 (newI 'nothing2 (list (numI 1))))
   (define nothing (newI 'nothing empty))
   (define posn27 (newI 'posn (list (numI 2) (numI 7))))
   (define posn531 (newI 'posn3D (list (numI 5) (numI 3) (numI 1))))
 
   ;;this & arg----------------------------------------------------
-  ;(test (typecheck (thisI) empty)
-  ;    (numT))
+  (test (typecheck (argI) empty)
+      (numT))
   ;(test (typecheck-posn (if0I (numI 0) (thisI) (numI 2)))
   ;      (numT))
-  ;(test (typecheck-posn (sendI posn27 'mdist (thisI)))
-  ;      (numT))
+
+  (test (typecheck-posn (sendI posn27 'mdist (getI (thisI) 'x)))
+        (numT))
 
   ;;cast ----------------------------------------------------    
   (test (typecheck-posn (castI 'posn posn27))
@@ -341,8 +355,23 @@
         "no type")
     
   ;;null ----------------------------------------------------
-  (test/exn (typecheck-posn (newI 'posn (list (numI 2) (nullI))))
+  (test/exn (typecheck-posn (sendI (nullI) 'mdist (numI 0)))
         "no type")
+  
+  (test (typecheck-posn (getI posn27 'x))                       
+        (numT))
+  
+  (test/exn (typecheck-posn (getI nothing-null 'x))                       
+        "no type")
+  
+  (test/exn (typecheck-nothing (newI 'nothing2 (list (numI 2) (numI 1))))
+        "no type")      
+  
+  (test (typecheck-posn (newI 'nothing (list (newI 'nothing (list (nullI))))))
+        (objT 'nothing))
+
+  (test (typecheck-posn (newI 'nothing (list nothing-null)))
+        (objT 'nothing))
   
   (test/exn (typecheck-posn (newI 'posn (list (numI 2) (nullI))))
         "no type")
@@ -352,10 +381,6 @@
   
   (test (typecheck-posn (newI 'posn4D (list (numI 5) (numI 3) (numI 1) (newI 'nothing (list (nullI))))))
         (objT 'posn4D))
-  ;(test (typecheck-posn (if0I (numI 0)
-   ;                          (nullI)
-    ;                          (newI 'posn3D (list (numI 5) (numI 3) (numI 3)))))
-     ;   (objT 'posn))
   
   ; What should happen if one is not a subtype of the other
   ;;if0 ----------------------------------------------------
@@ -456,7 +481,11 @@
                                  (methodI name body-expr)]))
                     methods))])))
 
-  
+(define interp-not-t : (ExprI (listof ClassT) -> Value)
+  (lambda (a t-classes)       
+      (interp-i a
+              (map strip-types t-classes))))
+
 (define interp-t : (ExprI (listof ClassT) -> Value)
   (lambda (a t-classes)
     (begin

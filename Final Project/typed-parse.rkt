@@ -85,6 +85,14 @@
       [objV (class-name field-vals) `object]
       [nullV () `null])))
 
+(define (interp-not-t-prog [classes : (listof s-expression)] [a : s-expression]) : s-expression
+  (let ([v (interp-not-t (parse a)
+                     (map parse-t-class classes))])
+    (type-case Value v
+      [numV (n) (number->s-exp n)]
+      [objV (class-name field-vals) `object]
+      [nullV () `null])))
+
 (module+ test
   (test (interp-t-prog
          (list
@@ -114,7 +122,7 @@
         '18)
   
   ;; null --------------------------------------------------
-  (test (interp-t-prog 
+  (test/exn (interp-t-prog 
          (list
           '{class nothing extends object
              {[x : num]}}            
@@ -135,7 +143,7 @@
                        {super mdist arg}}}})
          
          '{send {new posn3D 5 3 1 null} addDist {new posn 2 7}})
-        '18)
+        "no type")
   
   (test (interp-t-prog 
          (list
@@ -179,7 +187,9 @@
          
          `null)
         `null)
-  #|
+
+  ;; this ------------------------------------------------
+  ;#|
   (test (interp-t-prog 
         (list
          '{class posn extends object
@@ -197,7 +207,47 @@
                         {+ {get this z} 
                            {super mdist arg}}}})
         
-        '{send {new posn3D 5 this 1} addDist {new posn 2 7}})
+        '{send {new posn3D 5 arg 1} addDist {new posn 2 7}})
        '18)
-|#
+
+  (test (interp-not-t-prog 
+        (list
+         '{class posn extends object
+                 {[x : num]
+                  [y : num]}
+                 {mdist : num -> num
+                        {+ {get this x} {get this y}}}
+                 {addDist : posn -> num
+                          {+ {send arg mdist 0}
+                             {send this mdist 0}}}}
+         
+         '{class posn3D extends posn
+                 {[z : num]}
+                 {mdist : num -> num
+                        {+ {get this z} 
+                           {super mdist arg}}}})
+        
+        `this)
+       '18)
+
+  (test/exn (interp-t-prog 
+        (list
+         '{class posn extends object
+                 {[x : num]
+                  [y : num]}
+                 {mdist : num -> num
+                        {+ {get this x} {get this y}}}
+                 {addDist : posn -> num
+                          {+ {send arg mdist 0}
+                             {send this mdist 0}}}}
+         
+         '{class posn3D extends posn
+                 {[z : num]}
+                 {mdist : num -> num
+                        {+ {get this z} 
+                           {super mdist arg}}}})
+        
+        `arg)
+       "no type")
+  ;|#
   )
