@@ -88,21 +88,75 @@
        [classT (name super-name fields methods)
                (is-subclass? super-name name2 t-classes)])]))
 
+(define (subclass name1 name2 t-classes)
+  (cond
+    [(equal? name1 name2) (objT name1)]
+    [(equal? name1 'object) (objT name1)]
+    [else
+     (type-case ClassT (find-classT name1 t-classes)
+       [classT (name super-name1 fields methods)
+               (type-case ClassT (find-classT name2 t-classes)
+                 [classT (name super-name2 fields methods)
+                         (subclass super-name1 super-name2 t-classes)])])]))
+(define (w-subclass t1 t2 t-classes)
+  (type-case Type t1
+    [objT (name1)
+          (type-case Type t2
+            [objT (name2)
+                  (subclass name1 name2 t-classes)]
+            [else (error 'w-subclass "Error line 107")])]
+    [else (cond [(equal? t1 t2) t1])]))
+
 (define (is-subtype? t1 t2 t-classes)
   (type-case Type t1
     [objT (name1)
-          (type-case Type t2 
+          (type-case Type t2
             [objT (name2)
                   (is-subclass? name1 name2 t-classes)]
-     ;       [nullT () #t]
             [else false])]
-    ;[nullT () #t]
     [else (equal? t1 t2)]))
+
+;(define (super-subtype t1 t2 t-classes)
+;  (type-case Type t1
+;    [objT (name1)
+;          (type-case Type t2
+;            [objT (name2)
+;                  (type-case Type t1
+;                    [objT (name1) (is-subclass? name1 name2 t-classes)]
+;                    [else (error 'super-subtype "Error 107")])]
+;            [else false])]
+;    [else (equal? t1 t2)]))
 
 (module+ test
   (define a-t-class (classT 'a 'object empty empty))
   (define b-t-class (classT 'b 'a empty empty))
+  (define c-t-class (classT 'c 'a empty empty))
+  (define d-t-class (classT 'd 'c empty empty))
+  (define e-t-class (classT 'e 'c empty empty))
 
+  ;;if0 generic
+  ;;subclass --------------------------------------------
+  (test (subclass 'object 'object empty)
+        (objT 'object))
+  (test (subclass 'b 'c (list a-t-class b-t-class c-t-class))
+        (objT 'a))
+  (test (subclass 'c 'b (list a-t-class b-t-class c-t-class))
+        (objT 'a))
+  (test (subclass 'd 'e (list a-t-class
+                              b-t-class
+                              c-t-class
+                              d-t-class
+                              e-t-class))
+        (objT 'c))
+  #|
+  (test (subclass 'c 'd (list a-t-class
+                              b-t-class
+                              c-t-class
+                              d-t-class
+                              e-t-class))
+        (objT'c))
+  |#
+  ;;----------------------------------------------------
   (test (is-subclass? 'object 'object empty)
         true)
   (test (is-subclass? 'a 'b (list a-t-class b-t-class))
@@ -192,19 +246,25 @@
                                   arg-expr arg-type
                                   t-classes))]
         ;; My implemetations------------------------------------
+        ;*
         [instanceofI (obj-expr class-name)
                      (type-case Type (recur obj-expr)
                        [objT (c-name) (numT)]
                        [else (type-error obj-expr "object")])]
+        ;***
         [if0I (tst thn els)
               (if (is-subtype? (recur tst) (numT) empty)
                   (local [(define t-thn (recur thn))
                           (define t-els (recur els))]
                     [cond
                       [(is-subtype? t-thn t-els t-classes) t-els]
-                      [(is-subtype? t-els t-thn t-classes) t-thn]])                      
+                      [(is-subtype? t-els t-thn t-classes) t-thn]
+                      [else (w-subclass t-thn t-els t-classes)]
+                      ])                      
                   (type-error tst "num"))]
+        ;*
         [nullI () (nullT)]
+        ;**
         [castI (class-name obj-expr) ; Question: How to check for the super-type
                (local ([define obj-t (recur obj-expr)])
                  (if (is-subtype? (objT class-name) obj-t t-classes)
@@ -294,8 +354,21 @@
             (list (methodT 'mdist (numT) (numT)
                            (plusI (getI (thisI) 'z) 
                                   (superI 'mdist (argI)))))))
+  (define posn3D-2-t-class 
+    (classT 'posn3D-2 'posn
+            (list (fieldT 'z (numT)))
+            (list (methodT 'mdist (numT) (numT)
+                           (plusI (getI (thisI) 'z) 
+                                  (superI 'mdist (argI)))))))
+
   (define posn4D-t-class 
     (classT 'posn4D 'posn
+            (list (fieldT 'z (numT)) (fieldT 'ntn (objT 'nothing)))
+            (list (methodT 'mdist (numT) (numT)
+                           (plusI (getI (thisI) 'z) 
+                                  (superI 'mdist (argI)))))))
+  (define posn4D-2-t-class
+    (classT 'posn4D-2 'posn
             (list (fieldT 'z (numT)) (fieldT 'ntn (objT 'nothing)))
             (list (methodT 'mdist (numT) (numT)
                            (plusI (getI (thisI) 'z) 
@@ -330,14 +403,20 @@
   
   (define (typecheck-posn a)
     (typecheck a
-               (list posn-t-class posn3D-t-class posn4D-t-class square-t-class nothing-t-class)))
+               (list posn-t-class
+                     posn3D-t-class posn4D-t-class
+                     square-t-class nothing-t-class
+                     posn3D-2-t-class posn4D-2-t-class)))
 
   (define nothing-null (nullI))
-  (define nothing2 (newI 'nothing2 (list (numI 1))))
+  (define nothing2 (newI 'nothing2 (list (numI 1))))  
   (define nothing (newI 'nothing empty))
   (define posn27 (newI 'posn (list (numI 2) (numI 7))))
   (define posn531 (newI 'posn3D (list (numI 5) (numI 3) (numI 1))))
-
+  (define squarePosn (newI 'square (list posn27)))
+  (define posn3D-2 (newI 'posn3D-2 (list (numI 5) (numI 3) (numI 1))))
+  (define posn4D-2 (newI 'posn4D-2 (list (numI 5) (numI 3) (numI 1) (nullI))))
+  
   ;;this & arg----------------------------------------------------
   (test (typecheck (argI) empty)
       (numT))
@@ -384,6 +463,18 @@
   
   ; What should happen if one is not a subtype of the other
   ;;if0 ----------------------------------------------------
+  (test (typecheck-posn (if0I (numI 0)
+                              posn3D-2
+                              posn4D-2))
+        (objT 'posn))
+  (test (typecheck-posn (if0I (numI 0)
+                              posn4D-2
+                              posn3D-2))
+        (objT 'posn))
+  (test (typecheck-posn (if0I (numI 0)
+                              squarePosn
+                              posn27))
+        (objT 'object))
   (test (typecheck-posn (if0I (numI 0)
                               (newI 'posn (list (numI 2) (numI 7)))
                               (newI 'posn3D (list (numI 5) (numI 3) (numI 3)))))

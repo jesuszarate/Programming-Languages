@@ -207,8 +207,29 @@
                         {+ {get this z} 
                            {super mdist arg}}}})
         
+        `arg)
+       '-1)
+  
+  (test (interp-t-prog 
+        (list
+         '{class posn extends object
+                 {[x : num]
+                  [y : num]}
+                 {mdist : num -> num
+                        {+ {get this x} {get this y}}}
+                 {addDist : posn -> num
+                          {+ {send arg mdist 0}
+                             {send this mdist 0}}}}
+         
+         '{class posn3D extends posn
+                 {[z : num]}
+                 {mdist : num -> num
+                        {+ {get this z} 
+                           {super mdist arg}}}})
+        
         '{send {new posn3D 5 arg 1} addDist {new posn 2 7}})
        '18)
+  
 
   (test (interp-not-t-prog 
         (list
@@ -229,7 +250,7 @@
         
         `this)
        '18)
-
+  #|
   (test/exn (interp-t-prog 
         (list
          '{class posn extends object
@@ -249,5 +270,5 @@
         
         `arg)
        "no type")
-  ;|#
+  |#
   )
