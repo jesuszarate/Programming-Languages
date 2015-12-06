@@ -190,7 +190,7 @@
 
   ;; this ------------------------------------------------
   ;#|
-  (test (interp-t-prog 
+  (test/exn (interp-t-prog 
         (list
          '{class posn extends object
                  {[x : num]
@@ -208,9 +208,9 @@
                            {super mdist arg}}}})
         
         `arg)
-       '-1)
+       "no type")
   
-  (test (interp-t-prog 
+  (test/exn (interp-t-prog 
         (list
          '{class posn extends object
                  {[x : num]
@@ -228,10 +228,10 @@
                            {super mdist arg}}}})
         
         '{send {new posn3D 5 arg 1} addDist {new posn 2 7}})
-       '18)
+       "no type")
   
 
-  (test (interp-not-t-prog 
+  (test/exn (interp-t-prog 
         (list
          '{class posn extends object
                  {[x : num]
@@ -249,8 +249,8 @@
                            {super mdist arg}}}})
         
         `this)
-       '18)
-  #|
+       "no type")  
+#|
   (test/exn (interp-t-prog 
         (list
          '{class posn extends object

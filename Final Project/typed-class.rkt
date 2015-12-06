@@ -334,7 +334,12 @@
     (map (lambda (t-class)
            (typecheck-class t-class t-classes))
          t-classes)    
-    (typecheck-expr a t-classes (numT) (objT 'bad))))
+    ;(typecheck-expr a t-classes (numT) (objT 'bad))))
+    (local [(define return-type (typecheck-expr a t-classes (nullT) (objT 'bad)))]
+      (if (or (equal? return-type (nullT))
+              (equal? return-type (objT 'bad)))
+          (type-error a "no type")
+          return-type))))
 
 ;; ----------------------------------------
 
@@ -418,13 +423,17 @@
   (define posn4D-2 (newI 'posn4D-2 (list (numI 5) (numI 3) (numI 1) (nullI))))
   
   ;;this & arg----------------------------------------------------
-  (test (typecheck (argI) empty)
-      (numT))
+  (test/exn (typecheck (argI) empty)
+      "no type")
+  (test/exn (typecheck (thisI) empty)
+      "no type")
+  ;(test (typecheck-posn (newI 'posn (list (numI 1) (argI))))
+  ;   (numT))
   ;(test (typecheck-posn (if0I (numI 0) (thisI) (numI 2)))
   ;      (numT))
 
-  (test (typecheck-posn (sendI posn27 'mdist (getI (thisI) 'x)))
-        (numT))
+  ;(test (typecheck-posn (sendI posn27 'mdist (getI (argI) 'x)))
+   ;     (numT))
 
   ;;cast ----------------------------------------------------    
   (test (typecheck-posn (castI 'posn posn27))
