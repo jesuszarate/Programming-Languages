@@ -16,7 +16,10 @@
         (arg-expr : ExprC)]
   [if0C (tst : ExprC)
         (thn : ExprC)
-        (els : ExprC)])
+        (els : ExprC)]
+  [boxC (arg : ExprC)]
+  ;[unboxC (arg : ExprC)]
+  )
 
 #|
     (define-type ExprD
