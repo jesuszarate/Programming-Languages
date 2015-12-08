@@ -35,6 +35,7 @@
   14  [if0D (tst : ExprD)
             (thn : ExprD)
             (els : ExprD)])
+  200 [boxD (arg : ExprD)])
 |#
 
 #|
@@ -42,8 +43,21 @@
   15  [numV (n : number)]
   16  [closV (body : ExprD)
              (env : Env)])
+  300 [boxV (body : Location)]
 
 |#
+
+;; Location
+(define-type-alias Location number)
+
+;; Storage
+;(define v-reg 0)
+(define-type Storage
+  [cell (location : Location) (val : number)])
+
+(define-type-alias Store (listof Storage))
+(define mt-store empty)
+(define override-store cons)
 
 (define mt-env empty)
 (define extend-env cons)
@@ -75,6 +89,10 @@
               (else-expr : ExprD)
               (env : Env)
               (k : Cont)])
+  100 [doIf0K (arg-expr : ExprD)
+              (env : Env)
+              (k : Cont)])
+              
 |#
 
 #|
@@ -144,6 +162,8 @@
     (if0C (parse (second (s-exp->list s)))
           (parse (third (s-exp->list s)))
           (parse (fourth (s-exp->list s))))]
+   [(s-exp-match? '{box ANY} s)
+     (boxC (parse (second (s-exp->list s))))]
    [else (error 'parse "invalid input")]))
 
 (module+ test
@@ -176,7 +196,11 @@
           (code-malloc3 14
                         (compile test-expr env)
                         (compile then-expr env)
-                        (compile else-expr env))]))
+                        (compile else-expr env))]
+    
+    ;; Boxes
+    [boxC (arg) (code-malloc1 100 (compile arg env))]
+  ))
 
 (define (locate name env)
   (cond
@@ -335,7 +359,7 @@
       ;; White:
       (begin
         (case (vector-ref from-memory n)
-          [(0 15)
+          [(0 15 100)
            ;; size 1
            (begin
              (malloc1 (vector-ref from-memory n)
@@ -420,7 +444,11 @@
                             (code-ref expr-reg 3)
                             env-reg k-reg))
        (set! expr-reg (code-ref expr-reg 1))
-       (interp))]))
+       (interp))]
+    [(200) ; "box"
+     (begin
+       (set! v-reg (malloc1 100 (code-ref expr-reg 1)))
+       (continue))]))
 
 (define k-reg 0) ; Cont
 (define v-reg 0) ; Value
@@ -475,6 +503,7 @@
        (set! k-reg (ref k-reg 4))
        (interp))]))
 
+;; TODO: make sure x and y are numbers not boxes
 ;; num-op : (number number -> number) -> (Value Value -> Value)
 (define (num-op op)
   (lambda (x y)
@@ -508,7 +537,8 @@
     (set! env-reg env)
     (set! k-reg k)
     (interp)))
-(define (numV x) (malloc1 15 x))
+(define (numV x) (malloc1 15 x));"here"
+(define (boxV x) (malloc1 300 x))
 (define empty-env (malloc1 0 0))
 
 (define (vtest a b)
@@ -527,6 +557,14 @@
     (void)))
 
 (module+ test
+  ;; box -------------------------------------------           
+  (vtest (interpx (compile (parse '{box 10})
+                           mt-env)
+                  empty-env
+                  (init-k))
+         (boxV 10))
+  (reset!)
+  ;;------------------------------------------------  
   (vtest (interpx (compile (parse '10) mt-env)
                   empty-env
                   (init-k))
