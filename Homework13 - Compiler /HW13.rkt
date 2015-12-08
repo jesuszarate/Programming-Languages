@@ -35,7 +35,7 @@
   14  [if0D (tst : ExprD)
             (thn : ExprD)
             (els : ExprD)])
-  200 [boxD (arg : ExprD)])
+  102 [boxD (arg : ExprD)])
 |#
 
 #|
@@ -43,7 +43,7 @@
   15  [numV (n : number)]
   16  [closV (body : ExprD)
              (env : Env)])
-  300 [boxV (body : Location)]
+  103 [boxV (body : Location)]
 
 |#
 
@@ -89,7 +89,7 @@
               (else-expr : ExprD)
               (env : Env)
               (k : Cont)])
-  100 [doIf0K (arg-expr : ExprD)
+  100 [boxK (arg-expr : ExprD)
               (env : Env)
               (k : Cont)])
               
@@ -155,15 +155,15 @@
     (lamC (s-exp->symbol (first (s-exp->list 
                                  (second (s-exp->list s)))))
           (parse (third (s-exp->list s))))]
+   [(s-exp-match? '{box ANY} s)
+     (boxC (parse (second (s-exp->list s))))]
    [(s-exp-match? '{ANY ANY} s)
     (appC (parse (first (s-exp->list s)))
           (parse (second (s-exp->list s))))]
    [(s-exp-match? '{if0 ANY ANY ANY} s)
     (if0C (parse (second (s-exp->list s)))
           (parse (third (s-exp->list s)))
-          (parse (fourth (s-exp->list s))))]
-   [(s-exp-match? '{box ANY} s)
-     (boxC (parse (second (s-exp->list s))))]
+          (parse (fourth (s-exp->list s))))]   
    [else (error 'parse "invalid input")]))
 
 (module+ test
@@ -199,7 +199,7 @@
                         (compile else-expr env))]
     
     ;; Boxes
-    [boxC (arg) (code-malloc1 100 (compile arg env))]
+    [boxC (arg) (code-malloc1 102 (compile arg env))]
   ))
 
 (define (locate name env)
@@ -445,9 +445,10 @@
                             env-reg k-reg))
        (set! expr-reg (code-ref expr-reg 1))
        (interp))]
-    [(200) ; "box"
+    [(102) ; "box"
      (begin
-       (set! v-reg (malloc1 100 (code-ref expr-reg 1)))
+       
+       (set! v-reg (malloc2 103 (code-ref expr-reg 1) env-reg))
        (continue))]))
 
 (define k-reg 0) ; Cont
@@ -501,6 +502,14 @@
            (set! expr-reg (ref k-reg 2)))
        (set! env-reg (ref k-reg 3))
        (set! k-reg (ref k-reg 4))
+       (interp))]
+    [(100) ; boxK
+     (begin
+       (if (numzero? v-reg)
+           (set! expr-reg (ref k-reg 1))
+           (set! expr-reg (ref k-reg 2)))
+       (set! env-reg (ref k-reg 3))
+       (set! k-reg (ref k-reg 4))
        (interp))]))
 
 ;; TODO: make sure x and y are numbers not boxes
@@ -538,7 +547,7 @@
     (set! k-reg k)
     (interp)))
 (define (numV x) (malloc1 15 x));"here"
-(define (boxV x) (malloc1 300 x))
+(define (boxV x) (malloc1 103 x))
 (define empty-env (malloc1 0 0))
 
 (define (vtest a b)
