@@ -446,10 +446,10 @@
        (set! expr-reg (code-ref expr-reg 1))
        (interp))]
     [(102) ; "box"
-     (begin
-       
-       (set! v-reg (malloc2 103 (code-ref expr-reg 1) env-reg))
-       (continue))]))
+     (begin 
+       (set! k-reg (malloc2 100 env-reg k-reg))
+       (set! expr-reg (code-ref expr-reg 1))
+       (interp))]))
 
 (define k-reg 0) ; Cont
 (define v-reg 0) ; Value
