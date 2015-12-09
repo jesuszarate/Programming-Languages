@@ -18,7 +18,7 @@
         (thn : ExprC)
         (els : ExprC)]
   [boxC (arg : ExprC)]
-  ;[unboxC (arg : ExprC)]
+  [unboxC (arg : ExprC)]
   )
 
 #|
@@ -36,6 +36,7 @@
             (thn : ExprD)
             (els : ExprD)])
   102 [boxD (arg : ExprD)])
+  202 [unboxD (arg : ExprD)])
 |#
 
 #|
@@ -89,10 +90,12 @@
               (else-expr : ExprD)
               (env : Env)
               (k : Cont)])
-  100 [boxK (arg-expr : ExprD)
-              (env : Env)
+  100 [boxK               
               (k : Cont)])
-              
+
+  200 [unboxK              
+              (k : Cont)])
+
 |#
 
 #|
@@ -157,6 +160,8 @@
           (parse (third (s-exp->list s))))]
    [(s-exp-match? '{box ANY} s)
      (boxC (parse (second (s-exp->list s))))]
+   [(s-exp-match? '{unbox ANY} s)
+     (unboxC (parse (second (s-exp->list s))))]
    [(s-exp-match? '{ANY ANY} s)
     (appC (parse (first (s-exp->list s)))
           (parse (second (s-exp->list s))))]
@@ -200,6 +205,8 @@
     
     ;; Boxes
     [boxC (arg) (code-malloc1 102 (compile arg env))]
+
+    [unboxC (arg) (code-malloc1 202 (compile arg env))]
   ))
 
 (define (locate name env)
@@ -307,6 +314,10 @@
         result-reg)
       ;; updated-ptr points to first gray object:
       (case (ref updated-ptr 0)
+        [(100 103 200)
+         (begin
+           (move! 1)           
+           (done 1))]
         [(0 15)
          ;; Record has just an integer
          (done 1)]
@@ -359,7 +370,7 @@
       ;; White:
       (begin
         (case (vector-ref from-memory n)
-          [(0 15 100)
+          [(0 15 103 100 200)
            ;; size 1
            (begin
              (malloc1 (vector-ref from-memory n)
@@ -446,8 +457,14 @@
        (set! expr-reg (code-ref expr-reg 1))
        (interp))]
     [(102) ; "box"
-     (begin 
-       (set! k-reg (malloc2 100 env-reg k-reg))
+     (begin
+       (set! k-reg (malloc1 100 k-reg))       
+       (set! expr-reg (code-ref expr-reg 1))
+       (interp))]
+    
+    [(202) ; "unbox"
+     (begin       
+       (set! k-reg (malloc1 200 k-reg))       
        (set! expr-reg (code-ref expr-reg 1))
        (interp))]))
 
@@ -503,14 +520,16 @@
        (set! env-reg (ref k-reg 3))
        (set! k-reg (ref k-reg 4))
        (interp))]
-    [(100) ; boxK
+    [(100) ; doboxK 
+     (begin       
+       (set! k-reg (ref k-reg 1))              
+       (set! v-reg (malloc1 103 v-reg))
+       (continue))]
+    [(200) ; dounboxK
      (begin
-       (if (numzero? v-reg)
-           (set! expr-reg (ref k-reg 1))
-           (set! expr-reg (ref k-reg 2)))
-       (set! env-reg (ref k-reg 3))
-       (set! k-reg (ref k-reg 4))
-       (interp))]))
+       (set! k-reg (ref k-reg 1))
+       (set! v-reg (ref v-reg 1))
+       (continue))]))
 
 ;; TODO: make sure x and y are numbers not boxes
 ;; num-op : (number number -> number) -> (Value Value -> Value)
@@ -546,8 +565,7 @@
     (set! env-reg env)
     (set! k-reg k)
     (interp)))
-(define (numV x) (malloc1 15 x));"here"
-(define (boxV x) (malloc1 103 x))
+(define (numV x) (malloc1 15 x))
 (define empty-env (malloc1 0 0))
 
 (define (vtest a b)
@@ -566,13 +584,71 @@
     (void)))
 
 (module+ test
-  ;; box -------------------------------------------           
-  (vtest (interpx (compile (parse '{box 10})
+  (reset!)
+  (vtest (interpx (compile
+                   (parse '{unbox {unbox {box {box 3}}}})
+                   mt-env)
+                  empty-env
+                  (init-k))
+         (numV 3))  (reset!)
+  
+  (reset!)
+  (vtest (interpx (compile
+                   (parse
+                    '{{lambda {mkrec}
+                        {{{lambda {chain}
+                            {lambda {unchain}
+                              ;; Make a chain of boxes, then traverse
+                              ;; them:
+                              {{unchain 13} {chain 13}}}}
+                          ;; Create recursive chain function:
+                          {mkrec
+                           {lambda {chain}
+                             {lambda {n}
+                               {if0 n
+                                    1
+                                    {box {chain {+ n -1}}}}}}}}
+                         ;; Create recursive unchain function:
+                         {mkrec
+                          {lambda {unchain}
+                            {lambda {n}
+                              {lambda {b}
+                                {if0 n
+                                     b
+                                     {unbox {{unchain {+ n -1}} b}}}}}}}}}
+                      ;; mkrec:
+                      {lambda {body-proc}
+                        {{lambda {fX}
+                           {fX fX}}
+                         {lambda {fX}
+                           {body-proc {lambda {x} {{fX fX} x}}}}}}})
+                   mt-env)
+                  empty-env
+                  (init-k))
+         (numV 1))
+  (reset!)
+  #|
+  (vtest (interpx (compile (parse '{+ 99 77}) mt-env)
+                  empty-env
+                  (init-k))
+         (numV 16))
+  |#
+  ;; unbox -------------------------------------------
+  ;#|
+  (vtest (interpx (compile (parse '{unbox {box 10}})
                            mt-env)
                   empty-env
                   (init-k))
-         (boxV 10))
+         (numV 10))
   (reset!)
+  ;|#
+  ;; box -------------------------------------------           
+  ;(vtest (interpx (compile (parse '{box 10})
+   ;                        mt-env)
+    ;              empty-env
+     ;             (init-k))
+   ;      (boxV 0))
+  ;(reset!)
   ;;------------------------------------------------  
   (vtest (interpx (compile (parse '10) mt-env)
                   empty-env
