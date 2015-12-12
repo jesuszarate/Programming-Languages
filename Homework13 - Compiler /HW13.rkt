@@ -19,6 +19,8 @@
         (els : ExprC)]
   [boxC (arg : ExprC)]
   [unboxC (arg : ExprC)]
+  [setboxC (bx : ExprC)
+           (val : ExprC)]
   )
 
 #|
@@ -37,6 +39,8 @@
             (els : ExprD)])
   102 [boxD (arg : ExprD)])
   202 [unboxD (arg : ExprD)])
+  302 [setboxD (bx : ExprD)
+               (val : ExprD)])
 |#
 
 #|
@@ -68,6 +72,8 @@
 
 (define-type-alias EnvC (listof BindingC))
 
+(define setboxValK 300)
+(define doSetBoxK 303)
 #|
     (define-type Cont
   0   [doneK]
@@ -95,6 +101,12 @@
 
   200 [unboxK              
               (k : Cont)])
+
+  300 [setboxValK              
+              (k : Cont)])
+
+
+  303 [doSetBoxK ()]
 
 |#
 
@@ -162,6 +174,9 @@
      (boxC (parse (second (s-exp->list s))))]
    [(s-exp-match? '{unbox ANY} s)
      (unboxC (parse (second (s-exp->list s))))]
+   [(s-exp-match? '{set-box! ANY ANY} s)
+     (setboxC (parse (second (s-exp->list s)))
+             (parse (third (s-exp->list s))))]
    [(s-exp-match? '{ANY ANY} s)
     (appC (parse (first (s-exp->list s)))
           (parse (second (s-exp->list s))))]
@@ -205,8 +220,8 @@
     
     ;; Boxes
     [boxC (arg) (code-malloc1 102 (compile arg env))]
-
     [unboxC (arg) (code-malloc1 202 (compile arg env))]
+    [setboxC (bx val) (code-malloc2 302 (compile bx env) (compile val env))]
   ))
 
 (define (locate name env)
@@ -279,6 +294,10 @@
     (vector-set! memory (+ ptr 3) c)
     (vector-set! memory (+ ptr 4) d)
     (incptr 5)))
+
+(define (setbox-malloc location value)  
+  (vector-set! memory (+ location 1) value))
+  
 
 (define (ref n d)
   (vector-ref memory (+ n d)))
@@ -466,6 +485,14 @@
      (begin       
        (set! k-reg (malloc1 200 k-reg))       
        (set! expr-reg (code-ref expr-reg 1))
+       (interp))]
+    [(302) ; "setbox"
+     (begin              
+       (set! k-reg (malloc3 300
+                            (code-ref expr-reg 2)
+                            env-reg
+                            k-reg))
+       (set! expr-reg (code-ref expr-reg 1))
        (interp))]))
 
 (define k-reg 0) ; Cont
@@ -525,11 +552,27 @@
        (set! k-reg (ref k-reg 1))              
        (set! v-reg (malloc1 103 v-reg))
        (continue))]
-    [(200) ; dounboxK
+    [(200) ; unboxK
      (begin
        (set! k-reg (ref k-reg 1))
        (set! v-reg (ref v-reg 1))
-       (continue))]))
+       (continue))]
+    [(300) ; setboxValK
+     (begin       
+       (set! expr-reg (ref k-reg 1))
+       (set! env-reg (ref k-reg 2))
+       (set! k-reg (malloc2 doSetBoxK v-reg (ref k-reg 3)))
+       (interp)
+       )]
+    [(303) ; doSetBoxK
+     (begin
+       (setbox-malloc v-reg (ref k-reg 1))
+       (set! k-reg (ref k-reg 2))
+       (continue)
+       )]))
+       
+       
+       
 
 ;; TODO: make sure x and y are numbers not boxes
 ;; num-op : (number number -> number) -> (Value Value -> Value)
@@ -584,6 +627,42 @@
     (void)))
 
 (module+ test
+
+  (vtest (interpx (compile
+                   (parse '{set-box! {box 5} 6})
+                   mt-env)
+                  empty-env
+                (init-k))
+         (numV 6))
+         
+  ;(vtest (interpx (compile
+  ;(parse '{unbox {unbox {box {box 3}}}})
+    ;               mt-env)
+     ;             empty-env
+      ;            (init-k))
+       ;  (numV 3))
+  
+  (reset!)
+  (vtest (interpx (compile
+                   (parse '{{lambda {b}
+                              {{lambda {z}
+                                 {unbox b}}
+                               {set-box! b {+ {unbox b} 1}}}}
+                            {box 3}})
+                   mt-env)
+                  empty-env
+                  (init-k))
+         (numV 4))
+
+  
+  (vtest (interpx (compile
+                   (parse '{unbox {unbox {box {box 3}}}})
+                   mt-env)
+                  empty-env
+                  (init-k))
+         (numV 3))
+  
+  ;;----------------------------------------------------------------
   (reset!)
   (vtest (interpx (compile
                    (parse '{unbox {unbox {box {box 3}}}})
