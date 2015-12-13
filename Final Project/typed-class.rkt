@@ -98,6 +98,7 @@
                (type-case ClassT (find-classT name2 t-classes)
                  [classT (name super-name2 fields methods)
                          (subclass super-name1 super-name2 t-classes)])])]))
+
 (define (w-subclass t1 t2 t-classes)
   (type-case Type t1
     [objT (name1)
@@ -192,8 +193,14 @@
         [numI (n) (numT)]
         [plusI (l r) (typecheck-nums l r)]
         [multI (l r) (typecheck-nums l r)]
-        [argI () arg-type] ; Check here if arg is part of the main or a method (if it's in expr then it wont work)
-        [thisI () this-type]
+        [argI () ;arg-type] 
+              (if (equal? arg-type (nullT))
+                  (type-error arg-type "no null")
+                  arg-type)]
+        [thisI () ;this-type]
+               (if (equal? this-type (objT 'bad))
+                   (type-error this-type "bad obj")
+                   this-type)]
         [newI (class-name exprs)
               (local [(define arg-types (map recur exprs))
                       (define field-types
@@ -265,7 +272,7 @@
         ;*
         [nullI () (nullT)]
         ;**
-        [castI (class-name obj-expr) ; Question: How to check for the super-type
+        [castI (class-name obj-expr) 
                (local ([define obj-t (recur obj-expr)])
                  (if (is-subtype? (objT class-name) obj-t t-classes)
                      obj-t
@@ -334,12 +341,13 @@
     (map (lambda (t-class)
            (typecheck-class t-class t-classes))
          t-classes)    
-    ;(typecheck-expr a t-classes (numT) (objT 'bad))))
-    (local [(define return-type (typecheck-expr a t-classes (nullT) (objT 'bad)))]
-      (if (or (equal? return-type (nullT))
-              (equal? return-type (objT 'bad)))
-          (type-error a "no type")
-          return-type))))
+    (typecheck-expr a t-classes (nullT) (objT 'bad))))
+;(typecheck-expr a t-classes (numT) (objT 'bad))))
+;    (local [(define return-type (typecheck-expr a t-classes (nullT) (objT 'bad)))]
+;      (if (or (equal? return-type (nullT))
+;              (equal? return-type (objT 'bad)))
+;          (type-error a "no type")
+;          return-type))))
 
 ;; ----------------------------------------
 
@@ -443,6 +451,9 @@
         "no type")
     
   ;;null ----------------------------------------------------
+  (test (typecheck (nullI) empty)
+      (nullT))
+  
   (test/exn (typecheck-posn (sendI (nullI) 'mdist (numI 0)))
         "no type")
   
