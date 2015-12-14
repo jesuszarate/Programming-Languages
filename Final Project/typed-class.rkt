@@ -193,11 +193,11 @@
         [numI (n) (numT)]
         [plusI (l r) (typecheck-nums l r)]
         [multI (l r) (typecheck-nums l r)]
-        [argI () ;arg-type] 
+        [argI ()
               (if (equal? arg-type (nullT))
                   (type-error arg-type "no null")
                   arg-type)]
-        [thisI () ;this-type]
+        [thisI () 
                (if (equal? this-type (objT 'bad))
                    (type-error this-type "bad obj")
                    this-type)]
