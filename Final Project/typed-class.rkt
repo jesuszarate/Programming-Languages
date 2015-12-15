@@ -117,16 +117,6 @@
             [else false])]
     [else (equal? t1 t2)]))
 
-;(define (super-subtype t1 t2 t-classes)
-;  (type-case Type t1
-;    [objT (name1)
-;          (type-case Type t2
-;            [objT (name2)
-;                  (type-case Type t1
-;                    [objT (name1) (is-subclass? name1 name2 t-classes)]
-;                    [else (error 'super-subtype "Error 107")])]
-;            [else false])]
-;    [else (equal? t1 t2)]))
 
 (module+ test
   (define a-t-class (classT 'a 'object empty empty))
@@ -342,12 +332,6 @@
            (typecheck-class t-class t-classes))
          t-classes)    
     (typecheck-expr a t-classes (nullT) (objT 'bad))))
-;(typecheck-expr a t-classes (numT) (objT 'bad))))
-;    (local [(define return-type (typecheck-expr a t-classes (nullT) (objT 'bad)))]
-;      (if (or (equal? return-type (nullT))
-;              (equal? return-type (objT 'bad)))
-;          (type-error a "no type")
-;          return-type))))
 
 ;; ----------------------------------------
 
