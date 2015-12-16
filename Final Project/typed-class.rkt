@@ -140,14 +140,6 @@
                               d-t-class
                               e-t-class))
         (objT 'c))
-  #|
-  (test (subclass 'c 'd (list a-t-class
-                              b-t-class
-                              c-t-class
-                              d-t-class
-                              e-t-class))
-        (objT'c))
-  |#
   ;;----------------------------------------------------
   (test (is-subclass? 'object 'object empty)
         true)
@@ -388,13 +380,6 @@
             (list (methodT 'mdist (numT) (numT) 
                            (plusI (getI (nullI) 'x) (getI (thisI) 'y))))))
 
-  ;(define nothing2D-t-class
-   ; (classT 'nothing2D 'nothing
-    ;        (list (fieldT 'p (objT 'posn)))
-     ;       (list (methodT 'mdist (numT) (numT)
-      ;                     (plusI (getI (thisI) 'z) 
-       ;                           (superI 'mdist (argI)))))))
-
   (define (typecheck-nothing a)
     (typecheck a
                (list nothing2-t-class)))
@@ -420,14 +405,7 @@
       "no type")
   (test/exn (typecheck (thisI) empty)
       "no type")
-  ;(test (typecheck-posn (newI 'posn (list (numI 1) (argI))))
-  ;   (numT))
-  ;(test (typecheck-posn (if0I (numI 0) (thisI) (numI 2)))
-  ;      (numT))
-
-  ;(test (typecheck-posn (sendI posn27 'mdist (getI (argI) 'x)))
-   ;     (numT))
-
+  
   ;;cast ----------------------------------------------------    
   (test (typecheck-posn (castI 'posn posn27))
         (objT 'posn))
