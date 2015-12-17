@@ -115,6 +115,7 @@
             [objT (name2)
                   (is-subclass? name1 name2 t-classes)]
             [else false])]
+    ;Add null
     [else (equal? t1 t2)]))
 
 
