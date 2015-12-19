@@ -151,10 +151,7 @@
       [nullV () `null])))
 
 (module+ test
-  ;;null  ----------------------------------------
-  (test (interp-prog empty `null)
-        `null)
-  
+
   ;;  --------------------------------------------
   (test (interp-prog (list '{class fish extends object
                                    {size color}})
